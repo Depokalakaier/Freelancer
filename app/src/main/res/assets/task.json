@@ -1,0 +1,18 @@
+[
+    {
+      "id": "1",
+      "title": "Landing page redesign",
+      "description": "Redesign the main page for Acme Inc.",
+      "status": "Ukończone",
+      "client": "Acme Inc.",
+      "completedDate": "2025-04-11"
+    },
+    {
+      "id": "2",
+      "title": "Mobile app prototype",
+      "description": "Prepare Figma prototype.",
+      "status": "W trakcie",
+      "client": "Beta LLC",
+      "completedDate": ""
+    }
+  ]

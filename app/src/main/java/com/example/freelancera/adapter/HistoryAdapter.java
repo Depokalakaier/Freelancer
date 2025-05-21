@@ -1,0 +1,4 @@
+package com.example.freelancera.adapter;
+
+public class HistoryAdapter {
+}

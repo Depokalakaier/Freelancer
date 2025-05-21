@@ -1,0 +1,11 @@
+[
+    {
+      "taskId": "1",
+      "client": "Acme Inc.",
+      "totalAmount": 660.0,
+      "hourlyRate": 120.0,
+      "hoursWorked": 5.5,
+      "dueDate": "2025-04-18",
+      "sent": false
+    }
+  ]
