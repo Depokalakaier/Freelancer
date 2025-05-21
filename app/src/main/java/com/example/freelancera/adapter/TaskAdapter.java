@@ -6,8 +6,8 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
-import com.depokalakaier.freelancer.R;
-import com.depokalakaier.freelancer.model.Task;
+import com.example.freelancera.R;
+import com.example.freelancera.model.Task;
 import java.util.List;
 
 public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder> {
