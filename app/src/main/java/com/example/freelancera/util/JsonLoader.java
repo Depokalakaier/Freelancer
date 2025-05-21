@@ -2,6 +2,9 @@ package com.example.freelancera.util;
 
 import android.content.Context;
 import android.text.TextUtils;
+
+import com.example.freelancera.model.Invoice;
+import com.example.freelancera.model.SyncHistory;
 import com.example.freelancera.model.Task;
 import com.example.freelancera.model.WorkTime;
 import com.google.gson.Gson;
