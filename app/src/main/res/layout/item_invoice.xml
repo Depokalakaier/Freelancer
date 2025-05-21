@@ -1,6 +1,48 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:card_view="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="wrap_content"
+    card_view:cardElevation="4dp"
+    card_view:cardCornerRadius="8dp"
+    android:layout_margin="8dp">
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+    <LinearLayout
+        android:padding="16dp"
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <TextView android:id="@+id/invoice_client"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Klient"
+            android:textStyle="bold"
+            android:textSize="18sp"/>
+
+        <TextView android:id="@+id/invoice_amount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Kwota"
+            android:textSize="16sp"
+            android:layout_marginTop="4dp"/>
+
+        <TextView android:id="@+id/invoice_hours"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Godziny"
+            android:layout_marginTop="4dp"/>
+
+        <TextView android:id="@+id/invoice_due_date"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Termin"
+            android:layout_marginTop="4dp"/>
+
+        <TextView android:id="@+id/invoice_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Status"
+            android:layout_marginTop="4dp"/>
+    </LinearLayout>
+</androidx.cardview.widget.CardView>
