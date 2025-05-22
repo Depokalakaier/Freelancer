@@ -1,18 +1,26 @@
 [
-    {
-      "id": "1",
-      "title": "Landing page redesign",
-      "description": "Redesign the main page for Acme Inc.",
-      "status": "Ukończone",
-      "client": "Acme Inc.",
-      "completedDate": "2025-04-11"
-    },
-    {
-      "id": "2",
-      "title": "Mobile app prototype",
-      "description": "Prepare Figma prototype.",
-      "status": "W trakcie",
-      "client": "Beta LLC",
-      "completedDate": ""
-    }
-  ]
+  {
+    "id": "1",
+    "title": "Strona www dla klienta X",
+    "description": "Wdrożenie landing page",
+    "status": "Nowe",
+    "client": "Klient X",
+    "completedDate": null
+  },
+  {
+    "id": "2",
+    "title": "Logo dla Startup Y",
+    "description": "Projekt nowego logo",
+    "status": "W toku",
+    "client": "Startup Y",
+    "completedDate": null
+  },
+  {
+    "id": "3",
+    "title": "Aplikacja mobilna Z",
+    "description": "Prototyp aplikacji",
+    "status": "Nowe",
+    "client": "Firma Z",
+    "completedDate": null
+  }
+]

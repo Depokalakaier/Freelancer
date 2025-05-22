@@ -11,7 +11,6 @@ import com.example.freelancera.util.CalendarUtils;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.List;
 import java.util.Locale;
 
 public class SyncController {
@@ -21,11 +20,11 @@ public class SyncController {
     public static void syncTaskCompletion(Context context, Task task) {
         if (!"Ukończone".equals(task.getStatus())) return;
 
-        // Pobierz czas pracy
+        // 1. Pobierz mockowany czas pracy (z symulacji/mocka)
         WorkTime workTime = JsonLoader.findWorkTimeByTaskId(context, task.getId());
         double hours = workTime != null ? workTime.getTotalHours() : 0;
 
-        // Generuj fakturę
+        // 2. Wygeneruj mockowaną fakturę
         double amount = hours * DEFAULT_RATE;
         String dueDate = getFutureDate(7);
         Invoice invoice = new Invoice(
@@ -37,24 +36,25 @@ public class SyncController {
                 dueDate,
                 false
         );
-        // Tu możesz zapisać fakturę do pliku lub bazy
+        // TODO: Zapisz fakturę do pliku lub bazy (np. InvoiceRepository.save(invoice))
 
-        // Dodaj przypomnienie do kalendarza
+        // 3. Dodaj przypomnienie do kalendarza (na następny dzień)
         Calendar cal = Calendar.getInstance();
         cal.add(Calendar.DAY_OF_YEAR, 1);
-        CalendarUtils.addEventToCalendar(context,
+        CalendarUtils.addEventToCalendar(
+                context,
                 "Wyślij fakturę do " + task.getClient(),
                 "Zadanie: " + task.getTitle(),
                 cal.getTimeInMillis()
         );
 
-        // Dodaj wpis do historii
+        // 4. Dodaj wpis do historii synchronizacji
         SyncHistory history = new SyncHistory(
                 task.getTitle() + " – faktura utworzona, przypomnienie dodane",
                 new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date()),
                 "ok"
         );
-        // Tu możesz zapisać historię do pliku lub bazy
+        // TODO: Zapisz historię do pliku lub bazy (np. SyncHistoryRepository.save(history))
     }
 
     private static String getFutureDate(int daysAhead) {

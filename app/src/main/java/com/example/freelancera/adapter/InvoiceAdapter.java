@@ -1,5 +1,6 @@
 package com.example.freelancera.adapter;
 
+import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -12,9 +13,15 @@ import java.util.List;
 
 public class InvoiceAdapter extends RecyclerView.Adapter<InvoiceAdapter.InvoiceViewHolder> {
     private List<Invoice> invoiceList;
+    private OnInvoiceClickListener listener;
 
-    public InvoiceAdapter(List<Invoice> invoiceList) {
+    public interface OnInvoiceClickListener {
+        void onInvoiceClick(int position);
+    }
+
+    public InvoiceAdapter(List<Invoice> invoiceList, OnInvoiceClickListener listener) {
         this.invoiceList = invoiceList;
+        this.listener = listener;
     }
 
     @NonNull
@@ -32,6 +39,18 @@ public class InvoiceAdapter extends RecyclerView.Adapter<InvoiceAdapter.InvoiceV
         holder.hours.setText(invoice.getHoursWorked() + "h");
         holder.dueDate.setText("Termin: " + invoice.getDueDate());
         holder.status.setText(invoice.isSent() ? "Wysłana" : "Robocza");
+
+        if (invoice.isPaid()) {
+            holder.paidStatus.setText("Opłacona");
+            holder.paidStatus.setTextColor(Color.parseColor("#008800"));
+        } else {
+            holder.paidStatus.setText("Nieopłacona");
+            holder.paidStatus.setTextColor(Color.parseColor("#cc0000"));
+        }
+
+        holder.itemView.setOnClickListener(v -> {
+            if (listener != null) listener.onInvoiceClick(holder.getAdapterPosition());
+        });
     }
 
     @Override
@@ -39,8 +58,12 @@ public class InvoiceAdapter extends RecyclerView.Adapter<InvoiceAdapter.InvoiceV
         return invoiceList.size();
     }
 
+    public Invoice getInvoiceAt(int position) {
+        return invoiceList.get(position);
+    }
+
     static class InvoiceViewHolder extends RecyclerView.ViewHolder {
-        TextView client, amount, hours, dueDate, status;
+        TextView client, amount, hours, dueDate, status, paidStatus;
         InvoiceViewHolder(View v) {
             super(v);
             client = v.findViewById(R.id.invoice_client);
@@ -48,6 +71,7 @@ public class InvoiceAdapter extends RecyclerView.Adapter<InvoiceAdapter.InvoiceV
             hours = v.findViewById(R.id.invoice_hours);
             dueDate = v.findViewById(R.id.invoice_due_date);
             status = v.findViewById(R.id.invoice_status);
+            paidStatus = v.findViewById(R.id.invoice_paid_status);
         }
     }
 }

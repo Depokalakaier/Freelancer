@@ -3,8 +3,10 @@ package com.example.freelancera;
 import android.os.Bundle;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
+
+import com.example.freelancera.view.InvoiceDetailFragment;
 import com.example.freelancera.view.TaskListFragment;
-import com.example.freelancera.view.InvoiceFragment;
+import com.example.freelancera.view.InvoiceDetailFragment;
 import com.example.freelancera.view.HistoryFragment;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
@@ -12,7 +14,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setTheme(R.style.Theme_Freelancer); // Dla płynnego przejścia ze splash screen
+        setTheme(R.style.Theme_Freelancera); // Dla płynnego przejścia ze splash screen
         setContentView(R.layout.activity_main);
 
         BottomNavigationView nav = findViewById(R.id.bottom_navigation);
@@ -21,7 +23,7 @@ public class MainActivity extends AppCompatActivity {
             if (item.getItemId() == R.id.nav_tasks) {
                 fragment = new TaskListFragment();
             } else if (item.getItemId() == R.id.nav_invoices) {
-                fragment = new InvoiceFragment();
+                fragment = new InvoiceDetailFragment();
             } else {
                 fragment = new HistoryFragment();
             }

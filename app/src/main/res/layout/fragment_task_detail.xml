@@ -1,64 +1,76 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    xmlns:app="http://schemas.android.com/apk/res-auto">
+    android:layout_height="match_parent">
 
-    <TextView android:id="@+id/detail_task_title"
-        android:layout_width="0dp"
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Tytuł zadania"
-        android:textStyle="bold"
-        android:textSize="20sp"
-        android:layout_marginTop="16dp"
-        android:layout_marginHorizontal="16dp"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent"/>
+        android:padding="16dp">
 
-    <TextView android:id="@+id/detail_task_desc"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:text="Opis zadania"
-        android:layout_marginTop="8dp"
-        android:layout_marginHorizontal="16dp"
-        app:layout_constraintTop_toBottomOf="@id/detail_task_title"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent"/>
+        <TextView
+            android:id="@+id/text_task_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Tytuł zadania"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp"/>
 
-    <TextView android:id="@+id/detail_task_status"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Status"
-        android:layout_marginTop="8dp"
-        app:layout_constraintTop_toBottomOf="@id/detail_task_desc"
-        app:layout_constraintLeft_toLeftOf="parent"
-        android:layout_marginStart="16dp"/>
+        <TextView
+            android:id="@+id/text_task_client"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Klient"
+            android:textSize="16sp"
+            android:layout_marginBottom="8dp"/>
 
-    <TextView android:id="@+id/detail_task_client"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Klient"
-        android:layout_marginTop="8dp"
-        app:layout_constraintTop_toBottomOf="@id/detail_task_status"
-        app:layout_constraintLeft_toLeftOf="parent"
-        android:layout_marginStart="16dp"/>
+        <TextView
+            android:id="@+id/text_task_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Status"
+            android:textSize="16sp"
+            android:layout_marginBottom="8dp"/>
 
-    <TextView android:id="@+id/detail_task_time"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Czas pracy"
-        android:layout_marginTop="8dp"
-        app:layout_constraintTop_toBottomOf="@id/detail_task_client"
-        app:layout_constraintLeft_toLeftOf="parent"
-        android:layout_marginStart="16dp"/>
+        <TextView
+            android:id="@+id/text_task_desc"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Opis zadania"
+            android:layout_marginBottom="16dp"
+            android:textSize="15sp"/>
 
-    <TextView android:id="@+id/detail_task_completed"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Data ukończenia"
-        android:layout_marginTop="8dp"
-        app:layout_constraintTop_toBottomOf="@id/detail_task_time"
-        app:layout_constraintLeft_toLeftOf="parent"
-        android:layout_marginStart="16dp"/>
-</androidx.constraintlayout.widget.ConstraintLayout>
+        <TextView
+            android:id="@+id/text_work_time"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Czas pracy: 0 godz. 0 min."
+            android:textSize="16sp"
+            android:layout_marginBottom="8dp"/>
+
+        <Button
+            android:id="@+id/btn_start_stop_work"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Rozpocznij pracę"
+            android:layout_marginBottom="12dp"/>
+
+        <Button
+            android:id="@+id/btn_generate_invoice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Wystaw fakturę"
+            android:layout_marginBottom="8dp"/>
+
+        <Button
+            android:id="@+id/btn_export_pdf"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Eksportuj do PDF"
+            android:layout_marginTop="12dp"/>
+
+
+    </LinearLayout>
+</ScrollView>

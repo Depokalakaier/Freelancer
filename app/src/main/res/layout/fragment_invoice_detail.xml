@@ -1,0 +1,48 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/text_invoice_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Tytuł faktury"
+        android:textStyle="bold"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/text_invoice_client"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Klient" />
+
+    <TextView
+        android:id="@+id/text_invoice_amount"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Kwota" />
+
+    <TextView
+        android:id="@+id/text_invoice_date"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Data" />
+
+    <TextView
+        android:id="@+id/text_paid_status"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Nieopłacona"
+        android:textStyle="bold"
+        android:textColor="#FF0000"
+        android:layout_marginTop="8dp"/>
+
+    <Switch
+        android:id="@+id/switch_paid"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Oznacz jako opłacona"
+        android:layout_marginTop="12dp"/>
+</LinearLayout>

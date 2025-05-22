@@ -44,5 +44,15 @@
             android:layout_height="wrap_content"
             android:text="Status"
             android:layout_marginTop="4dp"/>
+
+        <!-- NOWE POLE: status opłacenia -->
+        <TextView
+            android:id="@+id/invoice_paid_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Nieopłacona"
+            android:textStyle="bold"
+            android:textSize="14sp"
+            android:layout_marginTop="4dp"/>
     </LinearLayout>
 </androidx.cardview.widget.CardView>
