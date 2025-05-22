@@ -147,6 +147,8 @@ public class JsonLoader {
         }
     }
 
+
+
     public static List<Invoice> loadInvoicesFromAssets(Context context) {
         try {
             InputStream is = context.getAssets().open("invoices.json");
