@@ -8,6 +8,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
+
         applicationId = "com.example.freelancera"
         minSdk = 24
         targetSdk = 35
@@ -35,10 +36,11 @@ android {
 dependencies {
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
-
+    implementation ("net.openid:appauth:0.11.1")
     // OkHttp (do logowania zapytań – pomocne przy debugowaniu)
     implementation("com.squareup.okhttp3:logging-interceptor:4.9.3")
-
+    implementation ("androidx.appcompat:appcompat:1.6.1")
+    implementation ("net.openid:appauth:0.11.1")
     // Jeśli chcesz pracować z JsonObject (z GSON lub Moshi):
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("com.google.code.gson:gson:2.10.1")
