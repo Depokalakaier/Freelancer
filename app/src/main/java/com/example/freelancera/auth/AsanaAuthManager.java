@@ -16,8 +16,8 @@ import net.openid.appauth.ResponseTypeValues;
 import net.openid.appauth.TokenRequest;
 
 public class AsanaAuthManager {
-    public static final String CLIENT_ID = "TWOJ_CLIENT_ID"; // <- wpisz swój
-    public static final String REDIRECT_URI = "freelancerauth://callback";
+    public static final String CLIENT_ID = "1210368184403679"; // <--- TWÓJ PRAWDZIWY CLIENT ID
+    public static final String REDIRECT_URI = "https://depokalakaier.github.io/Freelancer/";
     public static final String AUTH_ENDPOINT = "https://app.asana.com/-/oauth_authorize";
     public static final String TOKEN_ENDPOINT = "https://app.asana.com/-/oauth_token";
     private static AuthorizationService authService;
@@ -34,7 +34,10 @@ public class AsanaAuthManager {
                 CLIENT_ID,
                 ResponseTypeValues.CODE,
                 Uri.parse(REDIRECT_URI)
-        ).setScope("default").build();
+        )
+                // Dodaj potrzebne zakresy – możesz dodać więcej niż "default"
+                .setScope("openid profile email projects:read tasks:read")
+                .build();
         Intent authIntent = authService.getAuthorizationRequestIntent(request);
         activity.startActivityForResult(authIntent, requestCode);
     }

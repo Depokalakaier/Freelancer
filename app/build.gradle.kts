@@ -14,7 +14,7 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
-
+        manifestPlaceholders["appAuthRedirectScheme"] = "freelancerauth"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -40,16 +40,13 @@ dependencies {
     // OkHttp (do logowania zapytań – pomocne przy debugowaniu)
     implementation("com.squareup.okhttp3:logging-interceptor:4.9.3")
     implementation ("androidx.appcompat:appcompat:1.6.1")
-    implementation ("net.openid:appauth:0.11.1")
     // Jeśli chcesz pracować z JsonObject (z GSON lub Moshi):
-    implementation("com.google.code.gson:gson:2.10.1")
     implementation("com.google.code.gson:gson:2.10.1")
     implementation(libs.appcompat)
     implementation(libs.material)
     implementation(libs.activity)
     implementation(libs.constraintlayout)
     implementation(libs.firebase.crashlytics.buildtools)
-    implementation(libs.auth.api.impl)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
