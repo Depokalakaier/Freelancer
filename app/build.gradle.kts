@@ -1,6 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
-
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -42,6 +42,8 @@ dependencies {
     implementation ("androidx.appcompat:appcompat:1.6.1")
     // Jeśli chcesz pracować z JsonObject (z GSON lub Moshi):
     implementation("com.google.code.gson:gson:2.10.1")
+    implementation(platform("com.google.firebase:firebase-bom:33.14.0"))
+    implementation("com.google.firebase:firebase-analytics")
     implementation(libs.appcompat)
     implementation(libs.material)
     implementation(libs.activity)
