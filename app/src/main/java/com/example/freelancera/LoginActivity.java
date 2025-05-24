@@ -6,22 +6,29 @@ import android.text.TextUtils;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.FirebaseFirestore;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class LoginActivity extends AppCompatActivity {
 
     private EditText emailEditText, passwordEditText;
     private Button loginButton, goToRegisterButton;
     private FirebaseAuth auth;
+    private FirebaseFirestore firestore;
 
     @Override
-    protected void onCreate(@Nullable Bundle savedInstanceState) {
+    protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
 
         auth = FirebaseAuth.getInstance();
+        firestore = FirebaseFirestore.getInstance();
 
         emailEditText = findViewById(R.id.emailEditText);
         passwordEditText = findViewById(R.id.passwordEditText);
@@ -40,6 +47,22 @@ public class LoginActivity extends AppCompatActivity {
             auth.signInWithEmailAndPassword(email, password)
                     .addOnCompleteListener(task -> {
                         if (task.isSuccessful()) {
+                            FirebaseUser user = auth.getCurrentUser();
+
+                            // Zapisz dane użytkownika do Firestore
+                            if (user != null) {
+                                Map<String, Object> userData = new HashMap<>();
+                                userData.put("email", user.getEmail());
+                                userData.put("uid", user.getUid());
+                                userData.put("displayName", user.getDisplayName());
+                                userData.put("photoUrl", user.getPhotoUrl() != null ? user.getPhotoUrl().toString() : "");
+
+                                firestore.collection("users").document(user.getUid())
+                                        .set(userData);
+
+                                // Zapamiętaj sesję (np. przez SharedPreferences, Firebase i tak trzyma sesję)
+                            }
+
                             startActivity(new Intent(LoginActivity.this, MainActivity.class));
                             finish();
                         } else {

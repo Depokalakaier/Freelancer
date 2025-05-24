@@ -6,11 +6,13 @@
 
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
+        android:layout_height="wrap_content"
         android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
+        android:minHeight="?attr/actionBarSize"
         android:background="?attr/colorPrimary"
         app:title="Freelancer"
-        app:titleTextColor="@android:color/white" />
+        app:titleTextColor="@android:color/white"
+        app:popupTheme="@style/ThemeOverlay.AppCompat.Light"/>
 
     <FrameLayout
         android:id="@+id/fragment_container"
