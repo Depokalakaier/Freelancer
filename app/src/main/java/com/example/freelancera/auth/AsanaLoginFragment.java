@@ -27,6 +27,7 @@ public class AsanaLoginFragment extends Fragment {
         return v;
     }
 
+
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         AsanaAuthManager.handleAuthResponse(requestCode, resultCode, data, getContext(), OAUTH_REQUEST_CODE, new AsanaAuthManager.AuthCallback() {
