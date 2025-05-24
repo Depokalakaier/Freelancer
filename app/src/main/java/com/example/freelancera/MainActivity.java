@@ -1,7 +1,6 @@
 package com.example.freelancera;
 
 import android.content.Intent;
-import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -11,8 +10,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
-import com.example.freelancera.auth.AsanaLoginFragment;
-import com.example.freelancera.auth.AsanaAuthManager;
+
 import com.example.freelancera.auth.AsanaLoginFragment;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.firebase.auth.FirebaseAuth;
@@ -25,7 +23,6 @@ public class MainActivity extends AppCompatActivity {
     private FirebaseAuth auth;
     private FirebaseUser user;
     private FirebaseFirestore firestore;
-    private AsanaAuthManager asanaAuthManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -36,37 +33,31 @@ public class MainActivity extends AppCompatActivity {
         firestore = FirebaseFirestore.getInstance();
         user = auth.getCurrentUser();
 
-        // Set up toolbar (with profile icon)
+        // Toolbar z ikonką profilu
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
-        // Bottom navigation setup (leave as in your project)
+        // Bottom navigation (Twoja obecna konfiguracja, zachowana)
         BottomNavigationView bottomNavigationView = findViewById(R.id.bottom_navigation);
-        // You probably already have a listener for bottomNavigationView here
-
-        // Asana Auth Manager (init, if needed)
-        asanaAuthManager = new AsanaAuthManager(this);
-
-        // Optionally, handle Intent extras for Asana redirect result here
+        // Przypnij listener, jeśli masz fragmenty do obsługi
+        // bottomNavigationView.setOnItemSelectedListener(...);
     }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.menu_profile, menu);
 
-        // Set dynamic username in submenu
+        // Dynamiczne ustawienie nazwy użytkownika w submenu profilu
         MenuItem profileItem = menu.findItem(R.id.action_profile);
-        SubMenu subMenu = profileItem.getSubMenu();
+        SubMenu subMenu = profileItem != null ? profileItem.getSubMenu() : null;
 
-        if (user != null) {
+        if (user != null && subMenu != null) {
             MenuItem usernameItem = subMenu.findItem(R.id.menu_username);
             String displayName = user.getDisplayName();
             String email = user.getEmail();
-            String toShow = displayName != null && !displayName.isEmpty() ? displayName : email;
+            String toShow = (displayName != null && !displayName.isEmpty()) ? displayName : email;
             usernameItem.setTitle(toShow != null ? toShow : "Użytkownik");
-
-            // (Opcjonalnie) Avatar użytkownika - jeśli masz url w Firestore lub FirebaseUser
-            // Możesz tu rozbudować o pokazywanie obrazka w oknie dialogowym lub innym miejscu
+            // (opcjonalnie) avatar – jeśli kiedyś będziesz chciał dodać
         }
 
         return true;
@@ -78,14 +69,14 @@ public class MainActivity extends AppCompatActivity {
 
         if (id == R.id.menu_asana) {
             // Połącz konto z Asana
-            showAsanaLoginFragment();
+            connectWithAsana();
             return true;
         } else if (id == R.id.menu_settings) {
-            // Ustawienia (możesz dodać nową aktywność/fragment)
+            // Ustawienia (dodaj własną aktywność/fragment jeśli chcesz)
             Toast.makeText(this, "Ustawienia (do zrobienia)", Toast.LENGTH_SHORT).show();
             return true;
         } else if (id == R.id.menu_logout) {
-            // Wyloguj użytkownika
+            // Wylogowanie użytkownika
             FirebaseAuth.getInstance().signOut();
             Intent intent = new Intent(this, LoginActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
@@ -98,13 +89,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * Pokazuje fragment logowania do Asany. Po zakończonej autoryzacji
-     * token jest zapisywany do Firestore (dane integracji).
+     * Pokazuje fragment logowania do Asany.
+     * Po otrzymaniu tokena zapisuje go do Firestore.
      */
-    private void showAsanaLoginFragment() {
+    private void connectWithAsana() {
         AsanaLoginFragment fragment = new AsanaLoginFragment();
         fragment.setAsanaAuthListener(token -> {
-            // Token Asany uzyskany, zapisz do Firestore
             if (user != null) {
                 DocumentReference userRef = firestore.collection("users").document(user.getUid());
                 userRef.update("asanaToken", token)

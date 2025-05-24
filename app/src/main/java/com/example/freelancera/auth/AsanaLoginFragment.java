@@ -1,48 +1,76 @@
 package com.example.freelancera.auth;
 
-import android.content.Intent;
+import android.app.Dialog;
+import android.content.DialogInterface;
 import android.os.Bundle;
-import androidx.annotation.Nullable;
-import androidx.fragment.app.Fragment;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.Button;
-import android.widget.Toast;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
+import androidx.fragment.app.DialogFragment;
 
 import com.example.freelancera.R;
 
-public class AsanaLoginFragment extends Fragment {
-    private static final int OAUTH_REQUEST_CODE = 41;
-    private String accessToken = null;
+public class AsanaLoginFragment extends DialogFragment {
 
-    @Nullable
-    @Override
-    public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        View v = inflater.inflate(R.layout.fragment_asana_login, container, false);
-        Button btnLogin = v.findViewById(R.id.btnAsanaLogin);
-        btnLogin.setOnClickListener(view -> {
-            AsanaAuthManager.startAuthorization(getActivity(), OAUTH_REQUEST_CODE);
-        });
-        return v;
+    public interface AsanaAuthListener {
+        void onTokenReceived(String token);
     }
 
+    private AsanaAuthListener asanaAuthListener;
 
+    public void setAsanaAuthListener(AsanaAuthListener listener) {
+        this.asanaAuthListener = listener;
+    }
+
+    // Zamień poniższe na prawdziwy adres URL autoryzacji Asany (klucz klienta, redirect_uri, itd.)
+    private static final String AUTH_URL = "https://app.asana.com/-/oauth_authorize?client_id=TWOJE_CLIENT_ID&redirect_uri=freelancerauth://callback&response_type=token";
+
+    @NonNull
     @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        AsanaAuthManager.handleAuthResponse(requestCode, resultCode, data, getContext(), OAUTH_REQUEST_CODE, new AsanaAuthManager.AuthCallback() {
+    public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
+        View view = LayoutInflater.from(getActivity()).inflate(
+                R.layout.fragment_asana_login, null, false);
+
+        WebView webView = view.findViewById(R.id.webViewAsana);
+        webView.getSettings().setJavaScriptEnabled(true);
+        webView.loadUrl(AUTH_URL);
+
+        webView.setWebViewClient(new WebViewClient() {
             @Override
-            public void onSuccess(String token) {
-                // ZAPISZ token do SharedPreferences lub innego bezpiecznego miejsca
-                accessToken = token;
-                Toast.makeText(getContext(), "Zalogowano do Asana!", Toast.LENGTH_SHORT).show();
-                // Możesz pobierać dane z Asana
-            }
-            @Override
-            public void onError(String error) {
-                Toast.makeText(getContext(), "Błąd logowania: " + error, Toast.LENGTH_SHORT).show();
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                // Sprawdź redirect_uri i wyciągnij token
+                if (url.startsWith("freelancerauth://callback")) {
+                    // Przykład: freelancerauth://callback#access_token=TOKEN_HERE&token_type=Bearer&expires_in=3600
+                    String[] parts = url.split("#");
+                    if (parts.length > 1) {
+                        String[] params = parts[1].split("&");
+                        for (String param : params) {
+                            if (param.startsWith("access_token=")) {
+                                String token = param.replace("access_token=", "");
+                                if (asanaAuthListener != null) {
+                                    asanaAuthListener.onTokenReceived(token);
+                                }
+                                dismiss();
+                                return true;
+                            }
+                        }
+                    }
+                    dismiss();
+                    return true;
+                }
+                return false;
             }
         });
-        super.onActivityResult(requestCode, resultCode, data);
+
+        return new AlertDialog.Builder(requireContext())
+                .setTitle("Połącz z Asana")
+                .setView(view)
+                .setNegativeButton("Anuluj", (DialogInterface dialog, int which) -> dismiss())
+                .create();
     }
 }
