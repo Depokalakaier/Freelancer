@@ -2,39 +2,51 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/primaryColor">
+    android:background="@android:color/black">
 
-    <LinearLayout
-        android:orientation="vertical"
+    <!-- Gradient w górnej części -->
+    <View
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:gravity="center">
+        android:background="@drawable/top_gradient" />
+
+    <!-- Główna zawartość -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="24dp">
 
         <ImageView
-            android:src="@mipmap/ic_launcher"
+            android:id="@+id/logoImage"
             android:layout_width="120dp"
             android:layout_height="120dp"
-            android:contentDescription="Logo aplikacji"
-            android:layout_gravity="center"/>
+            android:src="@mipmap/ic_launcher"
+            android:contentDescription=""
+            android:layout_gravity="center"
+            android:scaleType="centerInside" />
 
         <TextView
-            android:id="@+id/textView"
+            android:id="@+id/appTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Freelancer"
-            android:textColor="@color/white"
-            android:textSize="32sp"
+            android:textSize="28sp"
             android:textStyle="bold"
-            android:layout_marginTop="24dp"
-            android:gravity="center"/>
+            android:textColor="#929292"
+            android:fontFamily="sans-serif-medium"
+            android:layout_marginTop="20dp" />
 
         <TextView
-            android:text="Automatyzacja pracy freelancera"
+            android:id="@+id/appSubtitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="@color/white"
+            android:text="Wspomaganie pracy freelancera"
             android:textSize="16sp"
+            android:textColor="#666666"
             android:layout_marginTop="8dp"
-            android:gravity="center"/>
+            android:fontFamily="sans-serif" />
     </LinearLayout>
+
 </FrameLayout>
