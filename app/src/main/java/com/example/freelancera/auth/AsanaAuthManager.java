@@ -16,7 +16,7 @@ import net.openid.appauth.ResponseTypeValues;
 import net.openid.appauth.TokenRequest;
 
 public class AsanaAuthManager {
-    public static final String CLIENT_ID = "1210368184403679"; // <--- TWÓJ PRAWDZIWY CLIENT ID
+    public static final String CLIENT_ID = "1210368184403679";
     public static final String REDIRECT_URI = "https://depokalakaier.github.io/Freelancer/";
     public static final String AUTH_ENDPOINT = "https://app.asana.com/-/oauth_authorize";
     public static final String TOKEN_ENDPOINT = "https://app.asana.com/-/oauth_token";

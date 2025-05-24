@@ -6,9 +6,12 @@
     <!-- Uprawnienia -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <application
+        android:name=".FreelanceraApp"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="Freelancer"
@@ -25,8 +28,9 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <!-- Poniżej android:scheme powinien odpowiadać temu co masz w AsanaAuthManager -->
-                <data android:scheme="freelancerauth" android:host="callback" />
+                <data android:scheme="https" 
+                      android:host="depokalakaier.github.io"
+                      android:pathPattern="/Freelancer/.*" />
             </intent-filter>
         </activity>
 
@@ -43,6 +47,7 @@
         <!-- Logowanie i rejestracja -->
         <activity android:name=".LoginActivity" />
         <activity android:name=".RegisterActivity" />
+        <activity android:name=".SettingsActivity" />
 
         <!-- Główny ekran -->
         <activity android:name=".MainActivity" />

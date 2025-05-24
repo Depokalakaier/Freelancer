@@ -1,10 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="primaryColor">#1976D2</color>
-    <color name="primaryDarkColor">#004BA0</color>
-    <color name="accentColor">#FFC107</color>
-    <color name="backgroundColor">#F5F5F5</color>
+    <!-- Kolory podstawowe -->
     <color name="white">#FFFFFF</color>
-    <color name="black">#000000</color>
-    <color name="gray">#757575</color>
+    <color name="black">#FF000000</color>
+
+    <!-- Kolory dla jasnego motywu -->
+    <color name="primary">@color/purple_500</color>
+    <color name="primary_variant">@color/purple_700</color>
+    <color name="secondary">@color/teal_200</color>
+    <color name="secondary_variant">@color/teal_700</color>
+    <color name="background">#FFFFFF</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="on_surface">#000000</color>
+    <color name="status_bar">#1976D2</color>
+
+    <!-- Kolory dla ciemnego motywu -->
+    <color name="primary_dark">#BB86FC</color>
+    <color name="primary_variant_dark">#3700B3</color>
+    <color name="secondary_dark">#03DAC6</color>
+    <color name="secondary_variant_dark">#03DAC6</color>
+    <color name="background_dark">#121212</color>
+    <color name="surface_dark">#121212</color>
+    <color name="on_surface_dark">#FFFFFF</color>
+    <color name="status_bar_dark">#000000</color>
+
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
 </resources>

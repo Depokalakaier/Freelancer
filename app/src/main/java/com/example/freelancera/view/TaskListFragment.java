@@ -72,22 +72,16 @@ public class TaskListFragment extends Fragment {
             }
         }
         // Sortowanie: Ukończone na dole, Nowe na górze
-        Collections.sort(filtered, new Comparator<Task>() {
-            @Override
-            public int compare(Task o1, Task o2) {
-                // Najpierw Nowe, potem W toku, na końcu Ukończone
-                List<String> order = new ArrayList<>();
-                order.add("Nowe");
-                order.add("W toku");
-                order.add("Ukończone");
-                int i1 = order.indexOf(o1.getStatus());
-                int i2 = order.indexOf(o2.getStatus());
-                return Integer.compare(i1, i2);
-            }
+        Collections.sort(filtered, (o1, o2) -> {
+            // Najpierw Nowe, potem W toku, na końcu Ukończone
+            List<String> order = List.of("Nowe", "W toku", "Ukończone");
+            int i1 = order.indexOf(o1.getStatus());
+            int i2 = order.indexOf(o2.getStatus());
+            return Integer.compare(i1, i2);
         });
 
         adapter = new TaskAdapter(filtered, task -> {
-            // Otwórz szczegóły zadania (możesz podmienić na własną nawigację)
+            // Otwórz szczegóły zadania
             TaskDetailFragment fragment = TaskDetailFragment.newInstance(task.getId());
             requireActivity().getSupportFragmentManager()
                     .beginTransaction()

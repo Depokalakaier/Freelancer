@@ -1,14 +1,70 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical" android:gravity="center"
-    android:layout_width="match_parent" android:layout_height="match_parent"
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
     android:padding="24dp">
 
-    <EditText android:id="@+id/emailEditText" android:hint="Email" android:inputType="textEmailAddress"
-        android:layout_width="match_parent" android:layout_height="wrap_content"/>
-    <EditText android:id="@+id/passwordEditText" android:hint="Hasło" android:inputType="textPassword"
-        android:layout_width="match_parent" android:layout_height="wrap_content"/>
-    <Button android:id="@+id/loginButton" android:text="Zaloguj"
-        android:layout_width="match_parent" android:layout_height="wrap_content"/>
-    <Button android:id="@+id/goToRegisterButton" android:text="Załóż konto"
-        android:layout_width="match_parent" android:layout_height="wrap_content"/>
-</LinearLayout>
+    <ImageView
+        android:id="@+id/appLogo"
+        android:layout_width="120dp"
+        android:layout_height="120dp"
+        android:src="@drawable/app_icon"
+        android:layout_marginTop="48dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+    <LinearLayout
+        android:id="@+id/loginForm"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="32dp"
+        app:layout_constraintTop_toBottomOf="@id/appLogo">
+
+        <EditText 
+            android:id="@+id/emailEditText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Email"
+            android:inputType="textEmailAddress"
+            android:layout_marginBottom="16dp"/>
+
+        <EditText
+            android:id="@+id/passwordEditText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Hasło"
+            android:inputType="textPassword"
+            android:layout_marginBottom="24dp"/>
+
+        <Button
+            android:id="@+id/loginButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Zaloguj"
+            android:layout_marginBottom="8dp"/>
+
+        <Button
+            android:id="@+id/goToRegisterButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Załóż konto"/>
+
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/typewriterText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="zaloguj sie do konta..."
+        android:textSize="16sp"
+        android:fontFamily="@font/pixel_font"
+        android:layout_marginBottom="32dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

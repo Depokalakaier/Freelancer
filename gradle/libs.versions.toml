@@ -11,6 +11,7 @@ firebaseCrashlyticsBuildtools = "3.0.3"
 authApiImpl = "11.6.0"
 firebaseFirestore = "25.1.4"
 firebaseAuth = "23.2.1"
+firebaseStorage = "21.0.2"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -24,6 +25,7 @@ firebase-crashlytics-buildtools = { group = "com.google.firebase", name = "fireb
 auth-api-impl = { group = "com.google.android.gms", name = "auth-api-impl", version.ref = "authApiImpl" }
 firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore", version.ref = "firebaseFirestore" }
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth", version.ref = "firebaseAuth" }
+firebase-storage = { group = "com.google.firebase", name = "firebase-storage", version.ref = "firebaseStorage" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

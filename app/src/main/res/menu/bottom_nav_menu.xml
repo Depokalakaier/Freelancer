@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
-        android:id="@+id/nav_tasks"
-        android:title="Zadania"
-        android:icon="@android:drawable/ic_menu_agenda"/>
+        android:id="@+id/navigation_tasks"
+        android:icon="@drawable/ic_task_24"
+        android:title="Zadania"/>
     <item
-        android:id="@+id/nav_invoices"
-        android:title="Faktury"
-        android:icon="@android:drawable/ic_menu_slideshow"/>
+        android:id="@+id/navigation_invoices"
+        android:icon="@drawable/ic_receipt_24"
+        android:title="Faktury"/>
     <item
-        android:id="@+id/nav_history"
-        android:title="Historia"
-        android:icon="@android:drawable/ic_menu_recent_history"/>
+        android:id="@+id/navigation_history"
+        android:icon="@drawable/ic_history_24"
+        android:title="Historia"/>
 </menu>

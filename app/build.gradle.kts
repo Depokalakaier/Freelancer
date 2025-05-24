@@ -31,6 +31,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
+    tasks.withType<JavaCompile>().configureEach {
+        options.compilerArgs.add("-Xlint:deprecation")
+    }
 }
 
 dependencies {
@@ -44,6 +48,8 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
     implementation(platform("com.google.firebase:firebase-bom:33.14.0"))
     implementation("com.google.firebase:firebase-analytics")
+    implementation("com.github.bumptech.glide:glide:4.15.1")
+    annotationProcessor("com.github.bumptech.glide:compiler:4.15.1")
     implementation(libs.appcompat)
     implementation(libs.material)
     implementation(libs.activity)
@@ -51,6 +57,7 @@ dependencies {
     implementation(libs.firebase.crashlytics.buildtools)
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.auth)
+    implementation("com.google.firebase:firebase-storage")
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
