@@ -1,5 +1,9 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.example.freelancera">
 
+    <!-- Uprawnienia -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -12,8 +16,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Freelancera">
 
+        <!-- AppAuth Redirect URI -->
         <activity android:name="net.openid.appauth.RedirectUriReceiverActivity"
-            android:exported="true">
+            android:exported="true"
+            tools:ignore="Instantiatable">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
@@ -22,6 +28,7 @@
             </intent-filter>
         </activity>
 
+        <!-- Splash (startowy ekran) -->
         <activity android:name=".SplashActivity"
             android:exported="true">
             <intent-filter>
@@ -29,6 +36,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Główna aktywność -->
         <activity android:name=".MainActivity"/>
 
         <!-- FileProvider do obsługi PDF -->

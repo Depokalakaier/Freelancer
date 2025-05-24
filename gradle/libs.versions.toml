@@ -9,6 +9,8 @@ activity = "1.10.1"
 constraintlayout = "2.2.1"
 firebaseCrashlyticsBuildtools = "3.0.3"
 authApiImpl = "11.6.0"
+firebaseFirestore = "25.1.4"
+firebaseAuth = "23.2.1"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -20,6 +22,8 @@ activity = { group = "androidx.activity", name = "activity", version.ref = "acti
 constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 firebase-crashlytics-buildtools = { group = "com.google.firebase", name = "firebase-crashlytics-buildtools", version.ref = "firebaseCrashlyticsBuildtools" }
 auth-api-impl = { group = "com.google.android.gms", name = "auth-api-impl", version.ref = "authApiImpl" }
+firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore", version.ref = "firebaseFirestore" }
+firebase-auth = { group = "com.google.firebase", name = "firebase-auth", version.ref = "firebaseAuth" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
