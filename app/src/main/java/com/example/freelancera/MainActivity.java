@@ -90,7 +90,16 @@ public class MainActivity extends AppCompatActivity {
                             )
                             .addOnSuccessListener(unused -> {
                                 Toast.makeText(MainActivity.this, "Połączono z Asana!", Toast.LENGTH_SHORT).show();
-                                updateAsanaConnectionUI(true);
+                                    // Aktualizuj UI w następnym bottom sheet
+                                if (profileBottomSheet != null && profileBottomSheet.isShowing()) {
+                                    View bottomSheetView = profileBottomSheet.findViewById(android.R.id.content);
+                                    if (bottomSheetView != null) {
+                                        MaterialButton connectButton = bottomSheetView.findViewById(R.id.connectAsanaButton);
+                                        if (connectButton != null) {
+                                            updateAsanaConnectionUI(connectButton, true);
+                                        }
+                                    }
+                                }
                                 loadAsanaTasks();
                             })
                             .addOnFailureListener(e -> Toast.makeText(MainActivity.this, 
@@ -101,7 +110,15 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onError(String error) {
                         Toast.makeText(MainActivity.this, "Błąd autoryzacji Asana: " + error, Toast.LENGTH_LONG).show();
-                        updateAsanaConnectionUI(false);
+                        if (profileBottomSheet != null && profileBottomSheet.isShowing()) {
+                            View bottomSheetView = profileBottomSheet.findViewById(android.R.id.content);
+                            if (bottomSheetView != null) {
+                                MaterialButton connectButton = bottomSheetView.findViewById(R.id.connectAsanaButton);
+                                if (connectButton != null) {
+                                    updateAsanaConnectionUI(connectButton, false);
+                                }
+                            }
+                        }
                     }
                 });
             }
@@ -209,6 +226,20 @@ public class MainActivity extends AppCompatActivity {
                 .setText(user.getEmail());
         }
 
+        // Sprawdź status połączenia z Asana
+        if (user != null) {
+            firestore.collection("users").document(user.getUid())
+                .get()
+                .addOnSuccessListener(document -> {
+                    boolean isConnected = document.contains("asanaToken") && 
+                                        document.getBoolean("asanaConnected") == Boolean.TRUE;
+                    updateAsanaConnectionUI(connectAsanaButton, isConnected);
+                })
+                .addOnFailureListener(e -> Toast.makeText(this,
+                    "Błąd podczas sprawdzania połączenia z Asana", 
+                    Toast.LENGTH_SHORT).show());
+        }
+
         // Obsługa zdjęcia profilowego
         profileImage.setOnClickListener(v -> {
             Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
@@ -217,8 +248,12 @@ public class MainActivity extends AppCompatActivity {
 
         // Obsługa przycisku Asana
         connectAsanaButton.setOnClickListener(v -> {
+            if (connectAsanaButton.getText().toString().equals("Rozłącz konto Asana")) {
+                disconnectFromAsana(connectAsanaButton);
+            } else {
+                connectWithAsana();
+            }
             profileBottomSheet.dismiss();
-            connectWithAsana();
         });
 
         // Obsługa przełącznika ciemnego motywu
@@ -249,44 +284,34 @@ public class MainActivity extends AppCompatActivity {
         profileBottomSheet.show();
     }
 
-    private void uploadProfileImage(Uri imageUri) {
-        if (user == null) return;
+    private void updateAsanaConnectionUI(MaterialButton button, boolean isConnected) {
+        if (button != null) {
+            if (isConnected) {
+                button.setText("Rozłącz konto Asana");
+                button.setBackgroundColor(androidx.core.content.ContextCompat.getColor(this, android.R.color.holo_red_light));
+            } else {
+                button.setText("Połącz z Asana");
+                button.setBackgroundColor(androidx.core.content.ContextCompat.getColor(this, android.R.color.holo_blue_light));
+            }
+        }
+    }
 
-        StorageReference storageRef = FirebaseStorage.getInstance().getReference()
-            .child("profile_images")
-            .child(user.getUid() + ".jpg");
-
-        // Dodaj metadata
-        StorageMetadata metadata = new StorageMetadata.Builder()
-            .setContentType("image/jpeg")
-            .build();
-
-        storageRef.putFile(imageUri, metadata)
-            .addOnSuccessListener(taskSnapshot -> {
-                storageRef.getDownloadUrl().addOnSuccessListener(uri -> {
-                    // Zaktualizuj URL zdjęcia w Firestore
-                    DocumentReference userRef = firestore.collection("users").document(user.getUid());
-                    userRef.update("photoUrl", uri.toString())
-                        .addOnSuccessListener(unused -> {
-                            Toast.makeText(MainActivity.this, "Zdjęcie profilowe zaktualizowane", Toast.LENGTH_SHORT).show();
-                            // Odśwież zdjęcie w toolbarze
-                            ShapeableImageView profileIcon = findViewById(R.id.profileIcon);
-                            Glide.with(this)
-                                .load(uri)
-                                .circleCrop()
-                                .into(profileIcon);
-                            // Odśwież bottom sheet
-                            if (profileBottomSheet != null && profileBottomSheet.isShowing()) {
-                                profileBottomSheet.dismiss();
-                                showProfileBottomSheet();
-                            }
-                        })
-                        .addOnFailureListener(e -> Toast.makeText(MainActivity.this,
-                            "Błąd aktualizacji zdjęcia: " + e.getMessage(), Toast.LENGTH_LONG).show());
-                });
+    private void disconnectFromAsana(MaterialButton button) {
+        if (user != null) {
+            DocumentReference userRef = firestore.collection("users").document(user.getUid());
+            userRef.update(
+                "asanaToken", null,
+                "asanaIdToken", null,
+                "asanaEmail", null,
+                "asanaConnected", false
+            )
+            .addOnSuccessListener(unused -> {
+                Toast.makeText(this, "Rozłączono z Asana!", Toast.LENGTH_SHORT).show();
+                updateAsanaConnectionUI(button, false);
             })
-            .addOnFailureListener(e -> Toast.makeText(MainActivity.this,
-                "Błąd przesyłania zdjęcia: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            .addOnFailureListener(e -> Toast.makeText(this, 
+                "Błąd podczas rozłączania z Asana: " + e.getMessage(), Toast.LENGTH_LONG).show());
+        }
     }
 
     private void connectWithAsana() {
@@ -303,7 +328,16 @@ public class MainActivity extends AppCompatActivity {
                     )
                     .addOnSuccessListener(unused -> {
                         Toast.makeText(this, "Połączono z Asana!", Toast.LENGTH_SHORT).show();
-                        updateAsanaConnectionUI(true);
+                        // Aktualizuj UI w następnym bottom sheet
+                        if (profileBottomSheet != null && profileBottomSheet.isShowing()) {
+                            View bottomSheetView = profileBottomSheet.findViewById(android.R.id.content);
+                            if (bottomSheetView != null) {
+                                MaterialButton connectButton = bottomSheetView.findViewById(R.id.connectAsanaButton);
+                                if (connectButton != null) {
+                                    updateAsanaConnectionUI(connectButton, true);
+                                }
+                            }
+                        }
                         loadAsanaTasks();
                     })
                     .addOnFailureListener(e -> Toast.makeText(this, 
@@ -313,61 +347,6 @@ public class MainActivity extends AppCompatActivity {
             fragment.show(getSupportFragmentManager(), "asana_login");
         } catch (Exception e) {
             Toast.makeText(this, "Błąd podczas łączenia z Asana: " + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
-    }
-
-    private void disconnectFromAsana() {
-        if (user != null) {
-            DocumentReference userRef = firestore.collection("users").document(user.getUid());
-            userRef.update(
-                "asanaToken", null,
-                "asanaIdToken", null,
-                "asanaEmail", null,
-                "asanaConnected", false
-            )
-            .addOnSuccessListener(unused -> {
-                Toast.makeText(this, "Rozłączono z Asana!", Toast.LENGTH_SHORT).show();
-                updateAsanaConnectionUI(false);
-            })
-            .addOnFailureListener(e -> Toast.makeText(this, 
-                "Błąd podczas rozłączania z Asana: " + e.getMessage(), Toast.LENGTH_LONG).show());
-        }
-    }
-
-    private void updateAsanaConnectionUI(boolean isConnected) {
-        MaterialButton connectAsanaButton = findViewById(R.id.connectAsanaButton);
-        if (connectAsanaButton != null) {
-            if (isConnected) {
-                connectAsanaButton.setText("Rozłącz konto Asana");
-                connectAsanaButton.setBackgroundColor(androidx.core.content.ContextCompat.getColor(this, android.R.color.holo_red_light));
-                connectAsanaButton.setOnClickListener(v -> disconnectFromAsana());
-            } else {
-                connectAsanaButton.setText("Połącz z Asana");
-                connectAsanaButton.setBackgroundColor(androidx.core.content.ContextCompat.getColor(this, android.R.color.holo_blue_light));
-                connectAsanaButton.setOnClickListener(v -> connectWithAsana());
-            }
-        }
-    }
-
-    private void checkAsanaConnection() {
-        if (user != null) {
-            firestore.collection("users").document(user.getUid())
-                .get()
-                .addOnSuccessListener(document -> {
-                    boolean isConnected = document.contains("asanaToken") && 
-                                        document.getBoolean("asanaConnected") == Boolean.TRUE;
-                    updateAsanaConnectionUI(isConnected);
-                    if (isConnected) {
-                        loadAsanaTasks();
-                    } else {
-                        Toast.makeText(this, 
-                            "Połącz najpierw konto z Asana. Kliknij ikonę profilu w prawym górnym rogu.", 
-                            Toast.LENGTH_LONG).show();
-                    }
-                })
-                .addOnFailureListener(e -> Toast.makeText(this,
-                    "Błąd podczas sprawdzania połączenia z Asana", 
-                    Toast.LENGTH_SHORT).show());
         }
     }
 
@@ -528,6 +507,67 @@ public class MainActivity extends AppCompatActivity {
             });
     }
 
+    private void checkAsanaConnection() {
+        if (user != null) {
+            firestore.collection("users").document(user.getUid())
+                .get()
+                .addOnSuccessListener(document -> {
+                    boolean isConnected = document.contains("asanaToken") && 
+                                        document.getBoolean("asanaConnected") == Boolean.TRUE;
+                    if (isConnected) {
+                        loadAsanaTasks();
+                    } else {
+                        Toast.makeText(this, 
+                            "Połącz najpierw konto z Asana. Kliknij ikonę profilu w prawym górnym rogu.", 
+                            Toast.LENGTH_LONG).show();
+                    }
+                })
+                .addOnFailureListener(e -> Toast.makeText(this,
+                    "Błąd podczas sprawdzania połączenia z Asana", 
+                    Toast.LENGTH_SHORT).show());
+        }
+    }
+
+    private void uploadProfileImage(Uri imageUri) {
+        if (user == null) return;
+
+        StorageReference storageRef = FirebaseStorage.getInstance().getReference()
+            .child("profile_images")
+            .child(user.getUid() + ".jpg");
+
+        // Dodaj metadata
+        StorageMetadata metadata = new StorageMetadata.Builder()
+            .setContentType("image/jpeg")
+            .build();
+
+        storageRef.putFile(imageUri, metadata)
+            .addOnSuccessListener(taskSnapshot -> {
+                storageRef.getDownloadUrl().addOnSuccessListener(uri -> {
+                    // Zaktualizuj URL zdjęcia w Firestore
+                    DocumentReference userRef = firestore.collection("users").document(user.getUid());
+                    userRef.update("photoUrl", uri.toString())
+                        .addOnSuccessListener(unused -> {
+                            Toast.makeText(MainActivity.this, "Zdjęcie profilowe zaktualizowane", Toast.LENGTH_SHORT).show();
+                            // Odśwież zdjęcie w toolbarze
+                            ShapeableImageView profileIcon = findViewById(R.id.profileIcon);
+                            Glide.with(this)
+                                .load(uri)
+                                .circleCrop()
+                                .into(profileIcon);
+                            // Odśwież bottom sheet
+                            if (profileBottomSheet != null && profileBottomSheet.isShowing()) {
+                                profileBottomSheet.dismiss();
+                                showProfileBottomSheet();
+                            }
+                        })
+                        .addOnFailureListener(e -> Toast.makeText(MainActivity.this,
+                            "Błąd aktualizacji zdjęcia: " + e.getMessage(), Toast.LENGTH_LONG).show());
+                });
+            })
+            .addOnFailureListener(e -> Toast.makeText(MainActivity.this,
+                "Błąd przesyłania zdjęcia: " + e.getMessage(), Toast.LENGTH_LONG).show());
+    }
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.menu_profile, menu);
@@ -558,10 +598,7 @@ public class MainActivity extends AppCompatActivity {
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         int id = item.getItemId();
 
-        if (id == R.id.menu_asana) {
-            connectWithAsana();
-            return true;
-        } else if (id == R.id.menu_settings) {
+        if (id == R.id.menu_settings) {
             startActivity(new Intent(this, SettingsActivity.class));
             return true;
         } else if (id == R.id.menu_logout) {

@@ -33,15 +33,6 @@
                     android:textColor="@color/white"
                     android:textSize="20sp"/>
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/connectAsanaButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:text="Połącz z Asana"
-                    android:textColor="@android:color/white"
-                    app:backgroundTint="@android:color/holo_blue_light" />
-
                 <com.google.android.material.imageview.ShapeableImageView
                     android:id="@+id/profileIcon"
                     android:layout_width="40dp"
