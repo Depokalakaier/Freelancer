@@ -16,6 +16,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.appcompat.widget.Toolbar;
+import android.widget.TextView;
 
 import com.bumptech.glide.Glide;
 import com.example.freelancera.auth.AsanaAuthManager;
@@ -105,31 +106,28 @@ public class MainActivity extends AppCompatActivity {
     private void setupToolbar() {
         Toolbar toolbar = findViewById(R.id.toolbar);
         if (toolbar != null) {
-            // Remove the default title from the Toolbar
-            toolbar.setTitle("");
+            toolbar.setTitle("");  // Pusty tytuł, bo mamy własny TextView
             setSupportActionBar(toolbar);
             
-            ShapeableImageView profileIcon = findViewById(R.id.profileIcon);
-            profileIcon.setOnClickListener(v -> showProfileBottomSheet());
-            
-            // Załaduj zdjęcie profilowe jeśli istnieje
-            if (user != null) {
-                StorageReference storageRef = FirebaseStorage.getInstance().getReference()
-                    .child("profile_images")
-                    .child(user.getUid() + ".jpg");
+            // Ustawienie tytułu w TextView
+            TextView toolbarTitle = toolbar.findViewById(R.id.toolbarTitle);
+            if (toolbarTitle != null) {
+                toolbarTitle.setText(getString(R.string.app_name));
+            }
+
+            // Ustawienie ikony profilu
+            ShapeableImageView profileIcon = toolbar.findViewById(R.id.profileIcon);
+            if (profileIcon != null) {
+                profileIcon.setOnClickListener(v -> showProfileBottomSheet());
                 
-                storageRef.getDownloadUrl()
-                    .addOnSuccessListener(uri -> {
-                        Glide.with(this)
-                            .load(uri)
-                            .circleCrop()
-                            .placeholder(R.drawable.ic_account_circle_24)
-                            .into(profileIcon);
-                    })
-                    .addOnFailureListener(e -> {
-                        // Użyj domyślnej ikony w przypadku błędu
-                        profileIcon.setImageResource(R.drawable.ic_account_circle_24);
-                    });
+                // Załaduj zdjęcie profilowe jeśli istnieje
+                if (user != null && user.getPhotoUrl() != null) {
+                    Glide.with(this)
+                        .load(user.getPhotoUrl())
+                        .placeholder(R.drawable.ic_account_circle_24)
+                        .error(R.drawable.ic_account_circle_24)
+                        .into(profileIcon);
+                }
             }
         }
     }

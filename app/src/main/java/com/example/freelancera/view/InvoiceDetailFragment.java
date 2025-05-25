@@ -44,11 +44,7 @@ public class InvoiceDetailFragment extends Fragment {
         paidSwitch = view.findViewById(R.id.switch_paid);
 
         if (getArguments() != null) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                invoice = getArguments().getParcelable(ARG_INVOICE, Invoice.class);
-            } else {
-                invoice = getArguments().getParcelable(ARG_INVOICE);
-            }
+            invoice = getArguments().getParcelable(ARG_INVOICE, Invoice.class);
         }
 
         if (invoice != null) {

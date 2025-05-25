@@ -4,6 +4,7 @@ import android.os.Bundle;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -32,6 +33,7 @@ public class TaskListFragment extends Fragment {
     private List<Task> allTasks = new ArrayList<>();
     private FirebaseFirestore firestore;
     private FirebaseUser user;
+    private SwipeRefreshLayout swipeRefreshLayout;
 
     public TaskListFragment() {}
 
@@ -45,6 +47,16 @@ public class TaskListFragment extends Fragment {
 
         recyclerView = view.findViewById(R.id.recyclerViewTasks);
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
+
+        // Inicjalizacja SwipeRefreshLayout
+        swipeRefreshLayout = view.findViewById(R.id.swipeRefreshLayout);
+        swipeRefreshLayout.setOnRefreshListener(this::refreshTasks);
+        swipeRefreshLayout.setColorSchemeResources(
+            android.R.color.holo_blue_bright,
+            android.R.color.holo_green_light,
+            android.R.color.holo_orange_light,
+            android.R.color.holo_red_light
+        );
 
         // Filtrowanie statusu
         filterSpinner = view.findViewById(R.id.task_filter_spinner);
@@ -71,8 +83,11 @@ public class TaskListFragment extends Fragment {
         return view;
     }
 
-    private void loadTasksFromFirestore() {
-        if (user == null) return;
+    private void refreshTasks() {
+        if (user == null) {
+            swipeRefreshLayout.setRefreshing(false);
+            return;
+        }
 
         firestore.collection("users")
                 .document(user.getUid())
@@ -85,11 +100,38 @@ public class TaskListFragment extends Fragment {
                         allTasks.add(task);
                     }
                     showFilteredTasks();
+                    swipeRefreshLayout.setRefreshing(false);
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(getContext(), 
+                        "Błąd podczas odświeżania zadań: " + e.getMessage(), 
+                        Toast.LENGTH_LONG).show();
+                    swipeRefreshLayout.setRefreshing(false);
+                });
+    }
+
+    private void loadTasksFromFirestore() {
+        if (user == null) return;
+
+        swipeRefreshLayout.setRefreshing(true);
+        firestore.collection("users")
+                .document(user.getUid())
+                .collection("tasks")
+                .get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    allTasks.clear();
+                    for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
+                        Task task = document.toObject(Task.class);
+                        allTasks.add(task);
+                    }
+                    showFilteredTasks();
+                    swipeRefreshLayout.setRefreshing(false);
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(getContext(), 
                         "Błąd podczas pobierania zadań: " + e.getMessage(), 
                         Toast.LENGTH_LONG).show();
+                    swipeRefreshLayout.setRefreshing(false);
                 });
     }
 
