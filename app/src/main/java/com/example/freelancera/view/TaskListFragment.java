@@ -12,13 +12,16 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Spinner;
+import android.widget.Toast;
 import com.example.freelancera.R;
 import com.example.freelancera.adapter.TaskAdapter;
-import com.example.freelancera.model.Task;
-import com.example.freelancera.util.JsonLoader;
+import com.example.freelancera.models.Task;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 
 public class TaskListFragment extends Fragment {
@@ -27,12 +30,18 @@ public class TaskListFragment extends Fragment {
     private TaskAdapter adapter;
     private Spinner filterSpinner;
     private List<Task> allTasks = new ArrayList<>();
+    private FirebaseFirestore firestore;
+    private FirebaseUser user;
 
     public TaskListFragment() {}
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_task_list, container, false);
+
+        // Inicjalizacja Firebase
+        firestore = FirebaseFirestore.getInstance();
+        user = FirebaseAuth.getInstance().getCurrentUser();
 
         recyclerView = view.findViewById(R.id.recyclerViewTasks);
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
@@ -47,9 +56,8 @@ public class TaskListFragment extends Fragment {
         spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         filterSpinner.setAdapter(spinnerAdapter);
 
-        // Załaduj zadania
-        allTasks = JsonLoader.loadTasksFromAssets(getContext());
-        showFilteredTasks();
+        // Załaduj zadania z Firestore
+        loadTasksFromFirestore();
 
         filterSpinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
             @Override
@@ -61,6 +69,28 @@ public class TaskListFragment extends Fragment {
         });
 
         return view;
+    }
+
+    private void loadTasksFromFirestore() {
+        if (user == null) return;
+
+        firestore.collection("users")
+                .document(user.getUid())
+                .collection("tasks")
+                .get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    allTasks.clear();
+                    for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
+                        Task task = document.toObject(Task.class);
+                        allTasks.add(task);
+                    }
+                    showFilteredTasks();
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(getContext(), 
+                        "Błąd podczas pobierania zadań: " + e.getMessage(), 
+                        Toast.LENGTH_LONG).show();
+                });
     }
 
     private void showFilteredTasks() {

@@ -9,8 +9,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import com.example.freelancera.R;
-import com.example.freelancera.model.Task;
-import com.example.freelancera.controller.SyncController;
+import com.example.freelancera.models.Task;
 import java.util.List;
 
 public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder> {
@@ -38,11 +37,11 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
     @Override
     public void onBindViewHolder(@NonNull TaskViewHolder holder, int position) {
         Task task = taskList.get(position);
-        holder.title.setText(task.getTitle());
+        holder.title.setText(task.getName());
         holder.desc.setText(task.getDescription());
         holder.status.setText(task.getStatus());
 
-        // Obsługa kliknięcia w całe zadanie (np. otwieranie szczegółów)
+        // Obsługa kliknięcia w całe zadanie
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) {
                 listener.onTaskClick(task);
@@ -55,11 +54,16 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
             holder.completeBtn.setOnClickListener(v -> {
                 task.setStatus("Ukończone");
                 notifyItemChanged(position);
-                SyncController.syncTaskCompletion(v.getContext(), task); // automatyzacja!
+                // TODO: Zaktualizuj status w Firestore
+                updateTaskStatusInFirestore(v.getContext(), task);
             });
         } else {
             holder.completeBtn.setVisibility(View.GONE);
         }
+    }
+
+    private void updateTaskStatusInFirestore(Context context, Task task) {
+        // TODO: Implement Firestore update
     }
 
     @Override

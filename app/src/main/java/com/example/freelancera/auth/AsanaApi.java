@@ -8,11 +8,11 @@ public class AsanaApi {
     private static final String TAG = "AsanaApi";
     private static final String BASE_URL = "https://app.asana.com/api/1.0";
 
-    public static void getProjects(String accessToken, okhttp3.Callback callback) {
-        Log.d(TAG, "Pobieranie projektów z Asana");
+    public static void getProjects(String accessToken, String workspaceId, okhttp3.Callback callback) {
+        Log.d(TAG, "Pobieranie projektów z Asana dla workspace: " + workspaceId);
         OkHttpClient client = new OkHttpClient();
         Request request = new Request.Builder()
-                .url(BASE_URL + "/workspaces/me/projects")
+                .url(BASE_URL + "/workspaces/" + workspaceId + "/projects?limit=100&opt_fields=name,notes,due_date,completed,owner,workspace,team,created_at,modified_at,public,archived")
                 .addHeader("Authorization", "Bearer " + accessToken)
                 .addHeader("Accept", "application/json")
                 .build();

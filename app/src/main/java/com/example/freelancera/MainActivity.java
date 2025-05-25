@@ -20,6 +20,8 @@ import androidx.appcompat.widget.Toolbar;
 import com.bumptech.glide.Glide;
 import com.example.freelancera.auth.AsanaAuthManager;
 import com.example.freelancera.auth.AsanaLoginFragment;
+import com.example.freelancera.models.Task;
+import com.example.freelancera.view.TaskListFragment;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
@@ -353,7 +355,7 @@ public class MainActivity extends AppCompatActivity {
                                         Log.d(TAG, "Znaleziono workspace: " + workspaceId + ", pobieram projekty...");
                                         
                                         // Pobierz projekty dla tego workspace
-                                        com.example.freelancera.auth.AsanaApi.getProjects(token, new okhttp3.Callback() {
+                                        com.example.freelancera.auth.AsanaApi.getProjects(token, workspaceId, new okhttp3.Callback() {
                                             @Override
                                             public void onFailure(okhttp3.Call call, java.io.IOException e) {
                                                 Log.e(TAG, "Błąd pobierania projektów: " + e.getMessage(), e);
@@ -399,7 +401,31 @@ public class MainActivity extends AppCompatActivity {
                                                                                 Toast.makeText(MainActivity.this, 
                                                                                     "Pobrano " + tasks.length() + " zadań z Asana!", 
                                                                                     Toast.LENGTH_SHORT).show();
-                                                                                // TODO: Wyświetl zadania w UI
+                                                                                
+                                                                                // Konwertuj i zapisz zadania do Firestore
+                                                                                for (int i = 0; i < tasks.length(); i++) {
+                                                                                    JSONObject taskJson = tasks.getJSONObject(i);
+                                                                                    Task task = Task.fromAsanaJson(taskJson);
+                                                                                    
+                                                                                    // Zapisz do Firestore
+                                                                                    firestore.collection("users")
+                                                                                        .document(user.getUid())
+                                                                                        .collection("tasks")
+                                                                                        .document(task.getId())
+                                                                                        .set(task)
+                                                                                        .addOnSuccessListener(aVoid -> {
+                                                                                            Log.d(TAG, "Zadanie zapisane: " + task.getName());
+                                                                                        })
+                                                                                        .addOnFailureListener(e -> {
+                                                                                            Log.e(TAG, "Błąd zapisu zadania: " + e.getMessage());
+                                                                                        });
+                                                                                }
+                                                                                
+                                                                                // Odśwież widok zadań
+                                                                                getSupportFragmentManager()
+                                                                                    .beginTransaction()
+                                                                                    .replace(R.id.fragment_container, new TaskListFragment())
+                                                                                    .commit();
                                                                             } catch (Exception e) {
                                                                                 Log.e(TAG, "Błąd parsowania zadań: " + e.getMessage(), e);
                                                                                 Toast.makeText(MainActivity.this, 
