@@ -70,129 +70,40 @@ public class MainActivity extends AppCompatActivity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         Log.d(TAG, "onNewIntent: otrzymano intent: " + intent);
-        Log.d(TAG, "onNewIntent: action = " + (intent != null ? intent.getAction() : "null"));
-        Log.d(TAG, "onNewIntent: categories = " + (intent != null ? intent.getCategories() : "null"));
-        Log.d(TAG, "onNewIntent: scheme = " + (intent != null && intent.getData() != null ? intent.getData().getScheme() : "null"));
-        Log.d(TAG, "onNewIntent: host = " + (intent != null && intent.getData() != null ? intent.getData().getHost() : "null"));
-        Log.d(TAG, "onNewIntent: path = " + (intent != null && intent.getData() != null ? intent.getData().getPath() : "null"));
-        Log.d(TAG, "onNewIntent: query = " + (intent != null && intent.getData() != null ? intent.getData().getQuery() : "null"));
-
-        Toast.makeText(this, "onNewIntent wywołane", Toast.LENGTH_LONG).show();
 
         if (intent != null && intent.getData() != null) {
             Uri data = intent.getData();
             Log.d(TAG, "onNewIntent: URI: " + data.toString());
-            Toast.makeText(this, "Callback URI: " + data.toString(), Toast.LENGTH_LONG).show();
-            // Automatyczne przechwycenie kodu autoryzacyjnego
-            String code = null;
-            String state = null;
-            try {
-                String query = data.getQuery();
-                Log.d(TAG, "Query: " + query);
-                Toast.makeText(this, "Query: " + query, Toast.LENGTH_LONG).show();
-                if (query != null) {
-                    String[] params = query.split("&");
-                    for (String param : params) {
-                        Log.d(TAG, "Parametr: " + param);
-                        if (param.startsWith("code=")) {
-                            code = param.substring(5);
-                            Log.d(TAG, "Znaleziono kod: " + code);
-                        } else if (param.startsWith("state=")) {
-                            state = param.substring(6);
-                            Log.d(TAG, "Znaleziono state: " + state);
+
+            if (data.getScheme().equals("freelancera") && data.getHost().equals("oauth")) {
+                AsanaAuthManager.handleOAuthCallback(data, this, new AsanaAuthManager.AuthCallback() {
+                    @Override
+                    public void onSuccess(AsanaAuthManager.AuthResult result) {
+                        if (user != null) {
+                            DocumentReference userRef = firestore.collection("users").document(user.getUid());
+                            userRef.update(
+                                "asanaToken", result.accessToken,
+                                "asanaIdToken", result.idToken,
+                                "asanaEmail", result.email,
+                                "asanaConnected", true
+                            )
+                            .addOnSuccessListener(unused -> {
+                                Toast.makeText(MainActivity.this, "Połączono z Asana!", Toast.LENGTH_SHORT).show();
+                                updateAsanaConnectionUI(true);
+                                loadAsanaTasks();
+                            })
+                            .addOnFailureListener(e -> Toast.makeText(MainActivity.this, 
+                                "Błąd zapisu tokena Asana: " + e.getMessage(), Toast.LENGTH_LONG).show());
                         }
                     }
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Błąd parsowania kodu autoryzacyjnego: " + e.getMessage(), e);
-                Toast.makeText(this, "Błąd parsowania kodu: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            }
-            Log.d(TAG, "Wyciągnięty code: " + code + ", state: " + state);
-            Toast.makeText(this, "Code: " + code + ", state: " + state, Toast.LENGTH_LONG).show();
-            if (code != null) {
-                Log.d(TAG, "Wysyłam request do Asana z code: " + code);
-                Toast.makeText(this, "Wysyłam request do Asana z code: " + code, Toast.LENGTH_LONG).show();
-                // Ręczna wymiana kodu na token Asana
-                OkHttpClient client = new OkHttpClient();
-                RequestBody body = new FormBody.Builder()
-                    .add("grant_type", "authorization_code")
-                    .add("client_id", "1210368184403679")
-                    .add("client_secret", "37984949b203b0a9ad86bc7b2d1d4d41")
-                    .add("redirect_uri", "https://depokalakaier.github.io/Freelancer")
-                    .add("code", code)
-                    .build();
 
-                Log.d(TAG, "Wysyłam request do Asana z parametrami:");
-                Log.d(TAG, "client_id: 1210368184403679");
-                Log.d(TAG, "redirect_uri: https://depokalakaier.github.io/Freelancer");
-                Log.d(TAG, "code: " + code);
-
-                Request request = new Request.Builder()
-                    .url("https://app.asana.com/-/oauth_token")
-                    .post(body)
-                    .build();
-
-                client.newCall(request).enqueue(new Callback() {
                     @Override
-                    public void onFailure(Call call, IOException e) {
-                        Log.e(TAG, "Błąd połączenia z Asana: " + e.getMessage(), e);
-                        runOnUiThread(() -> {
-                            Toast.makeText(MainActivity.this, "Błąd połączenia z Asana: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                        });
-                    }
-                    @Override
-                    public void onResponse(Call call, Response response) throws IOException {
-                        String responseBody = response.body().string();
-                        Log.d(TAG, "Kod odpowiedzi Asana: " + response.code());
-                        Log.d(TAG, "Odpowiedź Asana: " + responseBody);
-                        
-                        if (response.isSuccessful()) {
-                            try {
-                                JSONObject json = new JSONObject(responseBody);
-                                String accessToken = json.getString("access_token");
-                                String idToken = json.getString("id_token");
-                                String email = json.getString("email");
-                                Log.d(TAG, "Otrzymano token dostępu, idToken i email");
-                                
-                                runOnUiThread(() -> {
-                                    Toast.makeText(MainActivity.this, "Połączono z Asana!", Toast.LENGTH_SHORT).show();
-                                    // Zapisz token do Firestore
-                                    if (user != null) {
-                                        firestore.collection("users").document(user.getUid())
-                                            .update(
-                                                "asanaToken", accessToken,
-                                                "asanaIdToken", idToken,
-                                                "asanaEmail", email,
-                                                "asanaConnected", true
-                                            )
-                                            .addOnSuccessListener(aVoid -> {
-                                                Log.d(TAG, "Token Asana zapisany w Firestore");
-                                                Toast.makeText(MainActivity.this, "Token Asana zapisany", Toast.LENGTH_SHORT).show();
-                                                loadAsanaTasks(); // Od razu próbujemy załadować zadania
-                                            })
-                                            .addOnFailureListener(e -> {
-                                                Log.e(TAG, "Błąd zapisu tokena Asana: " + e.getMessage(), e);
-                                                Toast.makeText(MainActivity.this, "Błąd zapisu tokena Asana: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                                            });
-                                    }
-                                });
-                            } catch (Exception e) {
-                                Log.e(TAG, "Błąd parsowania odpowiedzi Asana: " + e.getMessage(), e);
-                                runOnUiThread(() -> Toast.makeText(MainActivity.this, "Błąd parsowania tokena Asana: " + e.getMessage(), Toast.LENGTH_LONG).show());
-                            }
-                        } else {
-                            Log.e(TAG, "Błąd odpowiedzi Asana: " + response.code() + " - " + responseBody);
-                            runOnUiThread(() -> Toast.makeText(MainActivity.this, "Błąd Asana: " + response.message() + "\n" + responseBody, Toast.LENGTH_LONG).show());
-                        }
+                    public void onError(String error) {
+                        Toast.makeText(MainActivity.this, "Błąd autoryzacji Asana: " + error, Toast.LENGTH_LONG).show();
+                        updateAsanaConnectionUI(false);
                     }
                 });
-            } else {
-                Log.e(TAG, "Nie znaleziono kodu autoryzacyjnego w URI");
-                Toast.makeText(this, "Nie znaleziono kodu autoryzacyjnego w URI", Toast.LENGTH_LONG).show();
             }
-        } else {
-            Log.d(TAG, "onNewIntent: brak danych w intent");
-            Toast.makeText(this, "onNewIntent: brak danych w intent", Toast.LENGTH_LONG).show();
         }
     }
 

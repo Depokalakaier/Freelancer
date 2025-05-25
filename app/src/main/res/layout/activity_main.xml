@@ -5,12 +5,9 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-
-    <include layout="@layout/section_search"/>
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
-
 
         <androidx.appcompat.widget.Toolbar
             android:id="@+id/toolbar"
@@ -21,35 +18,39 @@
             app:contentInsetEnd="0dp"
             app:contentInsetStart="16dp">
 
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
 
+                <TextView
+                    android:id="@+id/toolbarTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Freelancer"
+                    android:textColor="@color/white"
+                    android:textSize="20sp"/>
 
-            <TextView
-                android:id="@+id/toolbarTitle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Freelancer"
-                android:textColor="@color/white"
-                android:textSize="20sp"/>
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/connectAsanaButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:text="Połącz z Asana"
+                    android:textColor="@android:color/white"
+                    app:backgroundTint="@android:color/holo_blue_light" />
 
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/profileIcon"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginEnd="16dp"
+                    android:src="@drawable/ic_account_circle_24"
+                    app:shapeAppearanceOverlay="@style/CircleImageView"/>
 
-            <com.google.android.material.imageview.ShapeableImageView
-                android:id="@+id/profileIcon"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_gravity="end"
-                android:layout_marginEnd="16dp"
-                android:src="@drawable/ic_account_circle_24"
-                app:shapeAppearanceOverlay="@style/CircleImageView"/>
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/connectAsanaButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="end"
-                android:layout_marginEnd="16dp"
-                android:text="Połącz z Asana"
-                android:textColor="@android:color/white"
-                app:backgroundTint="@android:color/holo_blue_light" />
+            </LinearLayout>
 
         </androidx.appcompat.widget.Toolbar>
 
@@ -60,7 +61,6 @@
         android:layout_height="match_parent"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <!-- Tutaj będzie główna zawartość -->
         <FrameLayout
             android:id="@+id/fragment_container"
             android:layout_width="match_parent"

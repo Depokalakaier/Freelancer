@@ -61,64 +61,24 @@ public class AsanaAuthManager {
     public static void startAuthorization(Activity activity, int requestCode) {
         try {
             Log.d(TAG, "Rozpoczynam proces autoryzacji...");
-            authService = new AuthorizationService(activity);
-            AuthorizationServiceConfiguration config = new AuthorizationServiceConfiguration(
-                    Uri.parse(AUTH_ENDPOINT),
-                    Uri.parse(TOKEN_ENDPOINT)
-            );
-
-            // Generate PKCE code verifier and challenge
-            codeVerifier = generateRandomString();
-            String codeChallenge = generateCodeChallenge(codeVerifier);
-
+            
             // Generate state for CSRF protection
             state = generateRandomString();
 
-            AuthorizationRequest.Builder builder = new AuthorizationRequest.Builder(
-                    config,
-                    CLIENT_ID,
-                    ResponseTypeValues.CODE,
-                    Uri.parse(REDIRECT_URI)
-            );
+            // Build authorization URL
+            Uri authUri = Uri.parse(AUTH_ENDPOINT)
+                .buildUpon()
+                .appendQueryParameter("client_id", CLIENT_ID)
+                .appendQueryParameter("redirect_uri", REDIRECT_URI)
+                .appendQueryParameter("response_type", "code")
+                .appendQueryParameter("state", state)
+                .appendQueryParameter("scope", "openid email profile tasks:read projects:read workspaces:read")
+                .build();
 
-            // Add required parameters as per Asana docs
-            builder.setCodeVerifier(
-                codeVerifier,
-                codeChallenge,
-                "S256"
-            );
-
-            // Add state for CSRF protection
-            builder.setState(state);
-
-            // Add scopes
-            builder.setScopes(
-                "openid",
-                "email",
-                "profile",
-                "tasks:read",
-                "projects:read",
-                "workspaces:read"
-            );
-
-            AuthorizationRequest request = builder.build();
-
-            Log.d(TAG, "Konfiguracja autoryzacji:");
-            Log.d(TAG, "Client ID: " + CLIENT_ID);
-            Log.d(TAG, "Redirect URI: " + REDIRECT_URI);
-            Log.d(TAG, "Code verifier: " + codeVerifier);
-            Log.d(TAG, "Code challenge: " + codeChallenge);
-            Log.d(TAG, "State: " + state);
-            Log.d(TAG, "Auth endpoint: " + AUTH_ENDPOINT);
-            Log.d(TAG, "Token endpoint: " + TOKEN_ENDPOINT);
-
-            CustomTabsIntent.Builder customTabsBuilder = new CustomTabsIntent.Builder();
-            CustomTabsIntent customTabsIntent = customTabsBuilder.build();
-            
-            Log.d(TAG, "Otwieram Chrome Custom Tab z URL autoryzacji...");
-            Intent authIntent = authService.getAuthorizationRequestIntent(request, customTabsIntent);
-            activity.startActivityForResult(authIntent, requestCode);
-            Log.d(TAG, "Wysłano intent do przeglądarki");
+            // Open browser with authorization URL
+            Intent intent = new Intent(Intent.ACTION_VIEW, authUri);
+            activity.startActivity(intent);
+            Log.d(TAG, "Otwarto przeglądarkę z URL autoryzacji: " + authUri.toString());
 
         } catch (Exception e) {
             Log.e(TAG, "Error starting authorization: " + e.getMessage(), e);
@@ -130,83 +90,27 @@ public class AsanaAuthManager {
         }
     }
 
-    public static void handleAuthResponse(int requestCode, int resultCode, @Nullable Intent data, 
-                                        Context context, int expectedRequestCode, AuthCallback callback) {
-        Log.d(TAG, "Otrzymano odpowiedź autoryzacji:");
-        Log.d(TAG, "Request code: " + requestCode);
-        Log.d(TAG, "Result code: " + resultCode);
-        Log.d(TAG, "Data: " + (data != null ? data.getData() : "null"));
-        
-        if (requestCode == expectedRequestCode) {
-            if (data == null) {
-                Log.e(TAG, "Authentication data is null");
-                callback.onError("Błąd autoryzacji: brak danych odpowiedzi");
-                return;
-            }
+    public static void handleOAuthCallback(Uri uri, Context context, AuthCallback callback) {
+        try {
+            Log.d(TAG, "Otrzymano callback OAuth: " + uri.toString());
 
-            AuthorizationResponse response = AuthorizationResponse.fromIntent(data);
-            AuthorizationException ex = AuthorizationException.fromIntent(data);
+            // Extract tokens from URI parameters
+            String accessToken = uri.getQueryParameter("access_token");
+            String idToken = uri.getQueryParameter("id_token");
+            String email = uri.getQueryParameter("email");
 
-            if (response != null) {
-                Log.d(TAG, "Otrzymano odpowiedź autoryzacji:");
-                Log.d(TAG, "Authorization Code: " + response.authorizationCode);
-                Log.d(TAG, "State: " + response.state);
-
-                // Verify state parameter to prevent CSRF attacks
-                if (!state.equals(response.state)) {
-                    Log.e(TAG, "State mismatch. Expected: " + state + ", Got: " + response.state);
-                    callback.onError("Błąd bezpieczeństwa: niezgodność parametru state");
-                    return;
-                }
-
-                Log.d(TAG, "Rozpoczynam wymianę kodu na token...");
-                
-                // Exchange authorization code for tokens
-                authService.performTokenRequest(
-                    response.createTokenExchangeRequest(),
-                    (tokenResponse, tokenException) -> {
-                        if (tokenResponse != null) {
-                            String accessToken = tokenResponse.accessToken;
-                            String idToken = tokenResponse.idToken;
-                            
-                            if (accessToken != null && !accessToken.isEmpty()) {
-                                Log.d(TAG, "Otrzymano token dostępu i ID token");
-                                
-                                // Pobierz informacje o użytkowniku z tokenu ID
-                                String email = null;
-                                try {
-                                    String[] parts = idToken.split("\\.");
-                                    String payload = new String(Base64.decode(parts[1], Base64.URL_SAFE));
-                                    org.json.JSONObject json = new org.json.JSONObject(payload);
-                                    email = json.optString("email");
-                                } catch (Exception e) {
-                                    Log.e(TAG, "Błąd dekodowania ID tokenu", e);
-                                }
-                                
-                                callback.onSuccess(new AuthResult(accessToken, idToken, email));
-                            } else {
-                                Log.e(TAG, "Access token is null or empty");
-                                callback.onError("Nie udało się uzyskać tokenu dostępu");
-                            }
-                        } else if (tokenException != null) {
-                            Log.e(TAG, "Token exchange error: " + tokenException.getMessage(), tokenException);
-                            callback.onError("Błąd wymiany tokenu: " + tokenException.getMessage());
-                        }
-                    }
-                );
-            } else if (ex != null) {
-                Log.e(TAG, "Authorization error: " + ex.getMessage(), ex);
-                String errorMessage = "Błąd autoryzacji: ";
-                if (ex.getMessage() != null) {
-                    errorMessage += ex.getMessage();
-                } else {
-                    errorMessage += "nieznany błąd";
-                }
-                callback.onError(errorMessage);
+            if (accessToken != null && !accessToken.isEmpty()) {
+                Log.d(TAG, "Otrzymano token dostępu i dane użytkownika");
+                callback.onSuccess(new AuthResult(accessToken, idToken, email));
             } else {
-                Log.e(TAG, "Unknown authorization error");
-                callback.onError("Wystąpił nieoczekiwany błąd podczas autoryzacji");
+                String error = uri.getQueryParameter("error");
+                String errorDescription = uri.getQueryParameter("error_description");
+                Log.e(TAG, "Error in OAuth callback: " + error + " - " + errorDescription);
+                callback.onError(errorDescription != null ? errorDescription : error);
             }
+        } catch (Exception e) {
+            Log.e(TAG, "Error handling OAuth callback: " + e.getMessage(), e);
+            callback.onError("Błąd przetwarzania odpowiedzi OAuth: " + e.getMessage());
         }
     }
 
