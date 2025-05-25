@@ -83,7 +83,7 @@ public class TaskListFragment extends Fragment {
         return view;
     }
 
-    private void refreshTasks() {
+    public void refreshTasks() {
         if (user == null) {
             swipeRefreshLayout.setRefreshing(false);
             return;

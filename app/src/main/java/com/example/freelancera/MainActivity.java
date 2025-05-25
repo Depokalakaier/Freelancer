@@ -68,6 +68,14 @@ public class MainActivity extends AppCompatActivity {
 
         // Inicjalizacja image picker
         setupImagePicker();
+
+        // Wyświetl fragment z listą zadań
+        if (savedInstanceState == null) {
+            getSupportFragmentManager()
+                .beginTransaction()
+                .replace(R.id.fragment_container, new TaskListFragment())
+                .commit();
+        }
     }
 
     @Override
@@ -107,7 +115,6 @@ public class MainActivity extends AppCompatActivity {
         Toolbar toolbar = findViewById(R.id.toolbar);
         if (toolbar != null) {
             toolbar.setTitle("");  // Pusty tytuł, bo mamy własny TextView
-            setSupportActionBar(toolbar);
             
             // Ustawienie tytułu w TextView
             TextView toolbarTitle = toolbar.findViewById(R.id.toolbarTitle);
@@ -320,11 +327,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void loadAsanaTasks() {
-        if (user == null) return;
+        if (user == null) {
+            Toast.makeText(this, "Nie jesteś zalogowany", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        // Pokaż informację o ładowaniu
+        Toast.makeText(this, "Pobieranie zadań z Asany...", Toast.LENGTH_SHORT).show();
         
         firestore.collection("users").document(user.getUid()).get()
             .addOnSuccessListener(document -> {
-                if (document.contains("asanaToken")) {
+                if (document.contains("asanaToken") && document.getString("asanaToken") != null) {
                     String token = document.getString("asanaToken");
                     Log.d(TAG, "Znaleziono token Asana, pobieram workspaces...");
                     
@@ -333,8 +346,12 @@ public class MainActivity extends AppCompatActivity {
                         @Override
                         public void onFailure(okhttp3.Call call, java.io.IOException e) {
                             Log.e(TAG, "Błąd pobierania workspaces: " + e.getMessage(), e);
-                            runOnUiThread(() -> Toast.makeText(MainActivity.this, 
-                                "Błąd pobierania workspaces: " + e.getMessage(), Toast.LENGTH_LONG).show());
+                            runOnUiThread(() -> {
+                                Toast.makeText(MainActivity.this, 
+                                    "Błąd pobierania workspaces: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                                // Odśwież fragment mimo błędu
+                                refreshTaskListFragment();
+                            });
                         }
                         
                         @Override
@@ -465,27 +482,43 @@ public class MainActivity extends AppCompatActivity {
                                     }
                                 } catch (Exception e) {
                                     Log.e(TAG, "Błąd parsowania workspaces: " + e.getMessage(), e);
-                                    runOnUiThread(() -> Toast.makeText(MainActivity.this, 
-                                        "Błąd parsowania workspaces: " + e.getMessage(), 
-                                        Toast.LENGTH_LONG).show());
+                                    runOnUiThread(() -> {
+                                        Toast.makeText(MainActivity.this, 
+                                            "Błąd parsowania workspaces: " + e.getMessage(), 
+                                            Toast.LENGTH_LONG).show();
+                                        refreshTaskListFragment();
+                                    });
                                 }
                             } else {
                                 Log.e(TAG, "Błąd pobierania workspaces: " + response.code() + " - " + responseBody);
-                                runOnUiThread(() -> Toast.makeText(MainActivity.this, 
-                                    "Błąd pobierania workspaces: " + response.message(), 
-                                    Toast.LENGTH_LONG).show());
+                                runOnUiThread(() -> {
+                                    Toast.makeText(MainActivity.this, 
+                                        "Błąd pobierania workspaces: " + response.message(), 
+                                        Toast.LENGTH_LONG).show();
+                                    refreshTaskListFragment();
+                                });
                             }
                         }
                     });
                 } else {
                     Log.d(TAG, "Brak tokenu Asana");
                     Toast.makeText(this, "Brak tokenu Asana. Połącz najpierw konto.", Toast.LENGTH_LONG).show();
+                    refreshTaskListFragment();
                 }
             })
             .addOnFailureListener(e -> {
                 Log.e(TAG, "Błąd pobierania tokenu z Firestore: " + e.getMessage(), e);
                 Toast.makeText(this, "Błąd pobierania tokenu: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                refreshTaskListFragment();
             });
+    }
+
+    private void refreshTaskListFragment() {
+        TaskListFragment currentFragment = 
+            (TaskListFragment) getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+        if (currentFragment != null) {
+            currentFragment.refreshTasks();
+        }
     }
 
     private void checkAsanaConnection() {
