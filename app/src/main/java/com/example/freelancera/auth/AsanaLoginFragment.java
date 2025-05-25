@@ -8,6 +8,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.util.Log;
 import android.widget.TextView;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
@@ -19,15 +21,55 @@ public class AsanaLoginFragment extends DialogFragment {
     private static final String TAG = "AsanaLoginFragment";
     private AsanaAuthManager.AuthCallback authCallback;
     private TextView statusTextView;
+    private ActivityResultLauncher<android.content.Intent> authLauncher;
 
     public interface AsanaAuthListener {
-        void onTokenReceived(String token);
+        void onTokenReceived(AsanaAuthManager.AuthResult authResult);
     }
 
     private AsanaAuthListener asanaAuthListener;
 
     public void setAsanaAuthListener(AsanaAuthListener listener) {
         this.asanaAuthListener = listener;
+    }
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        
+        authLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getData() == null) {
+                    updateStatus("Otrzymano pusty wynik autoryzacji - prawdopodobnie zamknięto przeglądarkę");
+                    // Użytkownik zamknął przeglądarkę lub anulował logowanie
+                    if (getActivity() != null && !getActivity().isFinishing()) {
+                        new AlertDialog.Builder(getActivity())
+                            .setTitle("Błąd logowania")
+                            .setMessage("Anulowano logowanie do Asana lub zamknięto przeglądarkę.")
+                            .setPositiveButton("Spróbuj ponownie", (dialogInterface, which) -> {
+                                try {
+                                    updateStatus("Ponawiam próbę autoryzacji...");
+                                    startAuthorization();
+                                } catch (Exception e) {
+                                    updateStatus("Ponowna próba nie powiodła się: " + e.getMessage());
+                                    Log.e(TAG, "Error retrying authorization: " + e.getMessage());
+                                    dismiss();
+                                }
+                            })
+                            .setNegativeButton("Anuluj", (dialogInterface, which) -> {
+                                updateStatus("Anulowano proces logowania");
+                                dismiss();
+                            })
+                            .show();
+                    }
+                    return;
+                }
+                updateStatus("Otrzymano odpowiedź z przeglądarki, przetwarzam...");
+                AsanaAuthManager.handleAuthResponse(1001, result.getResultCode(), result.getData(), 
+                    requireContext(), 1001, authCallback);
+            }
+        );
     }
 
     private void updateStatus(String message) {
@@ -37,6 +79,12 @@ public class AsanaLoginFragment extends DialogFragment {
                 statusTextView.setText(message);
             });
         }
+    }
+
+    private void startAuthorization() {
+        updateStatus("Rozpoczynam autoryzację...");
+        AsanaAuthManager.startAuthorization(requireActivity(), 1001);
+        updateStatus("Otwieranie przeglądarki z autoryzacją Asana...");
     }
 
     @RequiresApi(api = Build.VERSION_CODES.O)
@@ -60,10 +108,47 @@ public class AsanaLoginFragment extends DialogFragment {
                 .create();
 
         try {
-            updateStatus("Rozpoczynam autoryzację...");
-            // Start OAuth using AppAuth
-            AsanaAuthManager.startAuthorization(requireActivity(), 1001);
-            updateStatus("Otwieranie przeglądarki z autoryzacją Asana...");
+            // Set up callback for auth result
+            authCallback = new AsanaAuthManager.AuthCallback() {
+                @Override
+                public void onSuccess(AsanaAuthManager.AuthResult result) {
+                    updateStatus("Otrzymano token dostępu i dane użytkownika!");
+                    if (asanaAuthListener != null) {
+                        asanaAuthListener.onTokenReceived(result);
+                    }
+                    dismiss();
+                }
+
+                @Override
+                public void onError(String error) {
+                    String errorMsg = "Błąd autoryzacji: " + error;
+                    Log.e(TAG, errorMsg);
+                    updateStatus(errorMsg);
+                    
+                    if (getActivity() != null && !getActivity().isFinishing()) {
+                        new AlertDialog.Builder(getActivity())
+                            .setTitle("Błąd logowania")
+                            .setMessage(errorMsg)
+                            .setPositiveButton("Spróbuj ponownie", (dialogInterface, which) -> {
+                                try {
+                                    updateStatus("Ponawiam próbę autoryzacji...");
+                                    startAuthorization();
+                                } catch (Exception e) {
+                                    updateStatus("Ponowna próba nie powiodła się: " + e.getMessage());
+                                    Log.e(TAG, "Error retrying authorization: " + e.getMessage());
+                                    dismiss();
+                                }
+                            })
+                            .setNegativeButton("Anuluj", (dialogInterface, which) -> {
+                                updateStatus("Anulowano proces logowania");
+                                dismiss();
+                            })
+                            .show();
+                    }
+                }
+            };
+
+            startAuthorization();
         } catch (Exception e) {
             String errorMsg = "Błąd rozpoczęcia autoryzacji: " + e.getMessage();
             Log.e(TAG, errorMsg, e);
@@ -75,7 +160,7 @@ public class AsanaLoginFragment extends DialogFragment {
                     .setPositiveButton("Spróbuj ponownie", (dialogInterface, which) -> {
                         try {
                             updateStatus("Ponawiam próbę autoryzacji...");
-                            AsanaAuthManager.startAuthorization(requireActivity(), 1001);
+                            startAuthorization();
                         } catch (Exception retryEx) {
                             updateStatus("Ponowna próba nie powiodła się: " + retryEx.getMessage());
                             dismiss();
@@ -88,81 +173,7 @@ public class AsanaLoginFragment extends DialogFragment {
                     .create();
         }
 
-        // Set up callback for auth result
-        authCallback = new AsanaAuthManager.AuthCallback() {
-            @Override
-            public void onSuccess(String accessToken) {
-                updateStatus("Otrzymano token dostępu!");
-                if (asanaAuthListener != null) {
-                    asanaAuthListener.onTokenReceived(accessToken);
-                }
-                dismiss();
-            }
-
-            @Override
-            public void onError(String error) {
-                String errorMsg = "Błąd autoryzacji: " + error;
-                Log.e(TAG, errorMsg);
-                updateStatus(errorMsg);
-                
-                if (getActivity() != null && !getActivity().isFinishing()) {
-                    new AlertDialog.Builder(getActivity())
-                        .setTitle("Błąd logowania")
-                        .setMessage(errorMsg)
-                        .setPositiveButton("Spróbuj ponownie", (dialogInterface, which) -> {
-                            try {
-                                updateStatus("Ponawiam próbę autoryzacji...");
-                                AsanaAuthManager.startAuthorization(requireActivity(), 1001);
-                            } catch (Exception e) {
-                                updateStatus("Ponowna próba nie powiodła się: " + e.getMessage());
-                                Log.e(TAG, "Error retrying authorization: " + e.getMessage());
-                                dismiss();
-                            }
-                        })
-                        .setNegativeButton("Anuluj", (dialogInterface, which) -> {
-                            updateStatus("Anulowano proces logowania");
-                            dismiss();
-                        })
-                        .show();
-                }
-            }
-        };
-
         return dialog;
-    }
-
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, @Nullable android.content.Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == 1001) {
-            if (data == null) {
-                updateStatus("Otrzymano pusty wynik autoryzacji - prawdopodobnie zamknięto przeglądarkę");
-                // Użytkownik zamknął przeglądarkę lub anulował logowanie
-                if (getActivity() != null && !getActivity().isFinishing()) {
-                    new AlertDialog.Builder(getActivity())
-                        .setTitle("Błąd logowania")
-                        .setMessage("Anulowano logowanie do Asana lub zamknięto przeglądarkę.")
-                        .setPositiveButton("Spróbuj ponownie", (dialogInterface, which) -> {
-                            try {
-                                updateStatus("Ponawiam próbę autoryzacji...");
-                                AsanaAuthManager.startAuthorization(requireActivity(), 1001);
-                            } catch (Exception e) {
-                                updateStatus("Ponowna próba nie powiodła się: " + e.getMessage());
-                                Log.e(TAG, "Error retrying authorization: " + e.getMessage());
-                                dismiss();
-                            }
-                        })
-                        .setNegativeButton("Anuluj", (dialogInterface, which) -> {
-                            updateStatus("Anulowano proces logowania");
-                            dismiss();
-                        })
-                        .show();
-                }
-                return;
-            }
-            updateStatus("Otrzymano odpowiedź z przeglądarki, przetwarzam...");
-            AsanaAuthManager.handleAuthResponse(requestCode, resultCode, data, requireContext(), 1001, authCallback);
-        }
     }
 
     @Override

@@ -72,24 +72,19 @@ public class SettingsActivity extends AppCompatActivity {
             if (connectAsanaButton.getText().toString().equals("Rozłącz")) {
                 disconnectAsana();
             } else {
-                showAsanaLogin();
+                connectWithAsana();
             }
         });
     }
 
-    private void showAsanaLogin() {
-        try {
-            AsanaLoginFragment fragment = new AsanaLoginFragment();
-            fragment.setAsanaAuthListener(token -> {
-                if (auth.getCurrentUser() != null && token != null) {
-                    saveAsanaToken(token);
-                }
-            });
-            fragment.show(getSupportFragmentManager(), "asana_login");
-        } catch (Exception e) {
-            Log.e(TAG, "Error showing Asana login: " + e.getMessage());
-            Toast.makeText(this, "Błąd podczas łączenia z Asana", Toast.LENGTH_SHORT).show();
-        }
+    private void connectWithAsana() {
+        AsanaLoginFragment fragment = new AsanaLoginFragment();
+        fragment.setAsanaAuthListener(authResult -> {
+            if (auth.getCurrentUser() != null) {
+                saveAsanaToken(authResult.accessToken);
+            }
+        });
+        fragment.show(getSupportFragmentManager(), "asana_login");
     }
 
     private void disconnectAsana() {

@@ -52,7 +52,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" 
                       android:host="depokalakaier.github.io"
-                      android:pathPrefix="/Freelancer" />
+                      android:path="/Freelancer/" />
             </intent-filter>
             <!-- Intent filter dla HTTP -->
             <intent-filter>
@@ -61,7 +61,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="http" 
                       android:host="depokalakaier.github.io"
-                      android:pathPrefix="/Freelancer" />
+                      android:path="/Freelancer/" />
             </intent-filter>
         </activity>
 

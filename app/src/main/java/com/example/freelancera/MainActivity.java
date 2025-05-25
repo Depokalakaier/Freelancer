@@ -150,14 +150,21 @@ public class MainActivity extends AppCompatActivity {
                             try {
                                 JSONObject json = new JSONObject(responseBody);
                                 String accessToken = json.getString("access_token");
-                                Log.d(TAG, "Otrzymano token dostępu");
+                                String idToken = json.getString("id_token");
+                                String email = json.getString("email");
+                                Log.d(TAG, "Otrzymano token dostępu, idToken i email");
                                 
                                 runOnUiThread(() -> {
                                     Toast.makeText(MainActivity.this, "Połączono z Asana!", Toast.LENGTH_SHORT).show();
                                     // Zapisz token do Firestore
                                     if (user != null) {
                                         firestore.collection("users").document(user.getUid())
-                                            .update("asanaToken", accessToken)
+                                            .update(
+                                                "asanaToken", accessToken,
+                                                "asanaIdToken", idToken,
+                                                "asanaEmail", email,
+                                                "asanaConnected", true
+                                            )
                                             .addOnSuccessListener(aVoid -> {
                                                 Log.d(TAG, "Token Asana zapisany w Firestore");
                                                 Toast.makeText(MainActivity.this, "Token Asana zapisany", Toast.LENGTH_SHORT).show();
@@ -373,17 +380,82 @@ public class MainActivity extends AppCompatActivity {
     private void connectWithAsana() {
         try {
             AsanaLoginFragment fragment = new AsanaLoginFragment();
-            fragment.setAsanaAuthListener(token -> {
+            fragment.setAsanaAuthListener(authResult -> {
                 if (user != null) {
                     DocumentReference userRef = firestore.collection("users").document(user.getUid());
-                    userRef.update("asanaToken", token)
-                            .addOnSuccessListener(unused -> Toast.makeText(this, "Połączono z Asana!", Toast.LENGTH_SHORT).show())
-                            .addOnFailureListener(e -> Toast.makeText(this, "Błąd zapisu tokena Asana: " + e.getMessage(), Toast.LENGTH_LONG).show());
+                    userRef.update(
+                        "asanaToken", authResult.accessToken,
+                        "asanaIdToken", authResult.idToken,
+                        "asanaEmail", authResult.email,
+                        "asanaConnected", true
+                    )
+                    .addOnSuccessListener(unused -> {
+                        Toast.makeText(this, "Połączono z Asana!", Toast.LENGTH_SHORT).show();
+                        updateAsanaConnectionUI(true);
+                        loadAsanaTasks();
+                    })
+                    .addOnFailureListener(e -> Toast.makeText(this, 
+                        "Błąd zapisu tokena Asana: " + e.getMessage(), Toast.LENGTH_LONG).show());
                 }
             });
             fragment.show(getSupportFragmentManager(), "asana_login");
         } catch (Exception e) {
             Toast.makeText(this, "Błąd podczas łączenia z Asana: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void disconnectFromAsana() {
+        if (user != null) {
+            DocumentReference userRef = firestore.collection("users").document(user.getUid());
+            userRef.update(
+                "asanaToken", null,
+                "asanaIdToken", null,
+                "asanaEmail", null,
+                "asanaConnected", false
+            )
+            .addOnSuccessListener(unused -> {
+                Toast.makeText(this, "Rozłączono z Asana!", Toast.LENGTH_SHORT).show();
+                updateAsanaConnectionUI(false);
+            })
+            .addOnFailureListener(e -> Toast.makeText(this, 
+                "Błąd podczas rozłączania z Asana: " + e.getMessage(), Toast.LENGTH_LONG).show());
+        }
+    }
+
+    private void updateAsanaConnectionUI(boolean isConnected) {
+        MaterialButton connectAsanaButton = findViewById(R.id.connectAsanaButton);
+        if (connectAsanaButton != null) {
+            if (isConnected) {
+                connectAsanaButton.setText("Rozłącz konto Asana");
+                connectAsanaButton.setBackgroundColor(androidx.core.content.ContextCompat.getColor(this, android.R.color.holo_red_light));
+                connectAsanaButton.setOnClickListener(v -> disconnectFromAsana());
+            } else {
+                connectAsanaButton.setText("Połącz z Asana");
+                connectAsanaButton.setBackgroundColor(androidx.core.content.ContextCompat.getColor(this, android.R.color.holo_blue_light));
+                connectAsanaButton.setOnClickListener(v -> connectWithAsana());
+            }
+        }
+    }
+
+    private void checkAsanaConnection() {
+        if (user != null) {
+            firestore.collection("users").document(user.getUid())
+                .get()
+                .addOnSuccessListener(document -> {
+                    boolean isConnected = document.contains("asanaToken") && 
+                                        document.getBoolean("asanaConnected") == Boolean.TRUE;
+                    updateAsanaConnectionUI(isConnected);
+                    if (isConnected) {
+                        loadAsanaTasks();
+                    } else {
+                        Toast.makeText(this, 
+                            "Połącz najpierw konto z Asana. Kliknij ikonę profilu w prawym górnym rogu.", 
+                            Toast.LENGTH_LONG).show();
+                    }
+                })
+                .addOnFailureListener(e -> Toast.makeText(this,
+                    "Błąd podczas sprawdzania połączenia z Asana", 
+                    Toast.LENGTH_SHORT).show());
         }
     }
 
@@ -396,27 +468,6 @@ public class MainActivity extends AppCompatActivity {
             finish();
         } catch (Exception e) {
             Toast.makeText(this, "Błąd podczas wylogowywania: " + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
-    }
-
-    private void checkAsanaConnection() {
-        if (user != null) {
-            firestore.collection("users").document(user.getUid())
-                .get()
-                .addOnSuccessListener(document -> {
-                    if (document.contains("asanaToken")) {
-                        // TODO: Załaduj zadania z Asana
-                        loadAsanaTasks();
-                    } else {
-                        // Pokaż komunikat o konieczności połączenia z Asana
-                        Toast.makeText(this, 
-                            "Połącz najpierw konto z Asana. Kliknij ikonę profilu w prawym górnym rogu.", 
-                            Toast.LENGTH_LONG).show();
-                    }
-                })
-                .addOnFailureListener(e -> Toast.makeText(this,
-                    "Błąd podczas sprawdzania połączenia z Asana", 
-                    Toast.LENGTH_SHORT).show());
         }
     }
 

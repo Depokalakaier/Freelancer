@@ -24,12 +24,24 @@ import java.security.MessageDigest;
 public class AsanaAuthManager {
     private static final String TAG = "AsanaAuthManager";
     public static final String CLIENT_ID = "1210368184403679";
-    public static final String REDIRECT_URI = "https://depokalakaier.github.io/Freelancer";
+    public static final String REDIRECT_URI = "https://depokalakaier.github.io/Freelancer/";
     public static final String AUTH_ENDPOINT = "https://app.asana.com/-/oauth_authorize";
     public static final String TOKEN_ENDPOINT = "https://app.asana.com/-/oauth_token";
     private static AuthorizationService authService;
     private static String codeVerifier;
     private static String state;
+
+    public static class AuthResult {
+        public final String accessToken;
+        public final String idToken;
+        public final String email;
+
+        public AuthResult(String accessToken, String idToken, String email) {
+            this.accessToken = accessToken;
+            this.idToken = idToken;
+            this.email = email;
+        }
+    }
 
     private static String generateRandomString() {
         SecureRandom secureRandom = new SecureRandom();
@@ -81,7 +93,12 @@ public class AsanaAuthManager {
 
             // Add scopes
             builder.setScopes(
-                "default"
+                "openid",
+                "email",
+                "profile",
+                "tasks:read",
+                "projects:read",
+                "workspaces:read"
             );
 
             AuthorizationRequest request = builder.build();
@@ -150,9 +167,23 @@ public class AsanaAuthManager {
                     (tokenResponse, tokenException) -> {
                         if (tokenResponse != null) {
                             String accessToken = tokenResponse.accessToken;
+                            String idToken = tokenResponse.idToken;
+                            
                             if (accessToken != null && !accessToken.isEmpty()) {
-                                Log.d(TAG, "Otrzymano token dostępu");
-                                callback.onSuccess(accessToken);
+                                Log.d(TAG, "Otrzymano token dostępu i ID token");
+                                
+                                // Pobierz informacje o użytkowniku z tokenu ID
+                                String email = null;
+                                try {
+                                    String[] parts = idToken.split("\\.");
+                                    String payload = new String(Base64.decode(parts[1], Base64.URL_SAFE));
+                                    org.json.JSONObject json = new org.json.JSONObject(payload);
+                                    email = json.optString("email");
+                                } catch (Exception e) {
+                                    Log.e(TAG, "Błąd dekodowania ID tokenu", e);
+                                }
+                                
+                                callback.onSuccess(new AuthResult(accessToken, idToken, email));
                             } else {
                                 Log.e(TAG, "Access token is null or empty");
                                 callback.onError("Nie udało się uzyskać tokenu dostępu");
@@ -180,7 +211,7 @@ public class AsanaAuthManager {
     }
 
     public interface AuthCallback {
-        void onSuccess(String accessToken);
+        void onSuccess(AuthResult result);
         void onError(String error);
     }
 

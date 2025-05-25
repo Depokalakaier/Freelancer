@@ -41,6 +41,16 @@
                 android:src="@drawable/ic_account_circle_24"
                 app:shapeAppearanceOverlay="@style/CircleImageView"/>
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/connectAsanaButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end"
+                android:layout_marginEnd="16dp"
+                android:text="Połącz z Asana"
+                android:textColor="@android:color/white"
+                app:backgroundTint="@android:color/holo_blue_light" />
+
         </androidx.appcompat.widget.Toolbar>
 
     </com.google.android.material.appbar.AppBarLayout>
