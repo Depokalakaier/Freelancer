@@ -1,7 +1,9 @@
 package com.example.freelancera.auth;
 
 import android.app.Dialog;
+import android.content.Context;
 import android.content.DialogInterface;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -28,6 +30,7 @@ public class AsanaLoginFragment extends DialogFragment {
     private ProgressBar progressBar;
     private ImageView statusIcon;
     private AlertDialog dialog;
+    private static AsanaLoginFragment currentInstance;
 
     public interface AsanaAuthListener {
         void onTokenReceived(AsanaAuthManager.AuthResult authResult);
@@ -42,6 +45,54 @@ public class AsanaLoginFragment extends DialogFragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        currentInstance = this;
+        setupAuthCallback();
+    }
+
+    public static void handleOAuthResponse(Uri uri, Context context) {
+        if (currentInstance != null && currentInstance.authCallback != null) {
+            AsanaAuthManager.handleOAuthCallback(uri, context, currentInstance.authCallback);
+        }
+    }
+
+    private void setupAuthCallback() {
+        authCallback = new AsanaAuthManager.AuthCallback() {
+            @Override
+            public void onSuccess(AsanaAuthManager.AuthResult result) {
+                updateStatus("Połączono!", true, false);
+                if (asanaAuthListener != null) {
+                    asanaAuthListener.onTokenReceived(result);
+                }
+            }
+
+            @Override
+            public void onError(String error) {
+                String errorMsg = "Błąd łączenia z kontem Asana";
+                Log.e(TAG, errorMsg + ": " + error);
+                updateStatus(errorMsg, false, true);
+                
+                if (getActivity() != null && !getActivity().isFinishing()) {
+                    new AlertDialog.Builder(getActivity())
+                        .setTitle("Błąd logowania")
+                        .setMessage(errorMsg)
+                        .setPositiveButton("Spróbuj ponownie", (dialogInterface, which) -> {
+                            try {
+                                updateStatus("Ponawiam próbę autoryzacji...", false, false);
+                                startAuthorization();
+                            } catch (Exception e) {
+                                updateStatus("Błąd łączenia z kontem Asana", false, true);
+                                Log.e(TAG, "Error retrying authorization: " + e.getMessage());
+                                dismiss();
+                            }
+                        })
+                        .setNegativeButton("Anuluj", (dialogInterface, which) -> {
+                            updateStatus("Anulowano proces logowania", false, true);
+                            dismiss();
+                        })
+                        .show();
+                }
+            }
+        };
     }
 
     private void updateStatus(String message, boolean isSuccess, boolean isError) {
@@ -108,45 +159,6 @@ public class AsanaLoginFragment extends DialogFragment {
                 .create();
 
         try {
-            // Set up callback for auth result
-            authCallback = new AsanaAuthManager.AuthCallback() {
-                @Override
-                public void onSuccess(AsanaAuthManager.AuthResult result) {
-                    updateStatus("Połączono!", true, false);
-                    if (asanaAuthListener != null) {
-                        asanaAuthListener.onTokenReceived(result);
-                    }
-                }
-
-                @Override
-                public void onError(String error) {
-                    String errorMsg = "Błąd łączenia z kontem Asana";
-                    Log.e(TAG, errorMsg + ": " + error);
-                    updateStatus(errorMsg, false, true);
-                    
-                    if (getActivity() != null && !getActivity().isFinishing()) {
-                        new AlertDialog.Builder(getActivity())
-                            .setTitle("Błąd logowania")
-                            .setMessage(errorMsg)
-                            .setPositiveButton("Spróbuj ponownie", (dialogInterface, which) -> {
-                                try {
-                                    updateStatus("Ponawiam próbę autoryzacji...", false, false);
-                                    startAuthorization();
-                                } catch (Exception e) {
-                                    updateStatus("Błąd łączenia z kontem Asana", false, true);
-                                    Log.e(TAG, "Error retrying authorization: " + e.getMessage());
-                                    dismiss();
-                                }
-                            })
-                            .setNegativeButton("Anuluj", (dialogInterface, which) -> {
-                                updateStatus("Anulowano proces logowania", false, true);
-                                dismiss();
-                            })
-                            .show();
-                    }
-                }
-            };
-
             startAuthorization();
         } catch (Exception e) {
             String errorMsg = "Błąd łączenia z kontem Asana";
@@ -178,6 +190,9 @@ public class AsanaLoginFragment extends DialogFragment {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        if (currentInstance == this) {
+            currentInstance = null;
+        }
         AsanaAuthManager.dispose();
     }
 }

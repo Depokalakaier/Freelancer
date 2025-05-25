@@ -77,50 +77,7 @@ public class MainActivity extends AppCompatActivity {
             Log.d(TAG, "onNewIntent: URI: " + data.toString());
 
             if (data.getScheme().equals("freelancera") && data.getHost().equals("oauth")) {
-                AsanaAuthManager.handleOAuthCallback(data, this, new AsanaAuthManager.AuthCallback() {
-                    @Override
-                    public void onSuccess(AsanaAuthManager.AuthResult result) {
-                        if (user != null) {
-                            DocumentReference userRef = firestore.collection("users").document(user.getUid());
-                            userRef.update(
-                                "asanaToken", result.accessToken,
-                                "asanaIdToken", result.idToken,
-                                "asanaEmail", result.email,
-                                "asanaConnected", true
-                            )
-                            .addOnSuccessListener(unused -> {
-                                Toast.makeText(MainActivity.this, "Połączono z Asana!", Toast.LENGTH_SHORT).show();
-                                    // Aktualizuj UI w następnym bottom sheet
-                                if (profileBottomSheet != null && profileBottomSheet.isShowing()) {
-                                    View bottomSheetView = profileBottomSheet.findViewById(android.R.id.content);
-                                    if (bottomSheetView != null) {
-                                        MaterialButton connectButton = bottomSheetView.findViewById(R.id.connectAsanaButton);
-                                        if (connectButton != null) {
-                                            updateAsanaConnectionUI(connectButton, true);
-                                        }
-                                    }
-                                }
-                                loadAsanaTasks();
-                            })
-                            .addOnFailureListener(e -> Toast.makeText(MainActivity.this, 
-                                "Błąd zapisu tokena Asana: " + e.getMessage(), Toast.LENGTH_LONG).show());
-                        }
-                    }
-
-                    @Override
-                    public void onError(String error) {
-                        Toast.makeText(MainActivity.this, "Błąd autoryzacji Asana: " + error, Toast.LENGTH_LONG).show();
-                        if (profileBottomSheet != null && profileBottomSheet.isShowing()) {
-                            View bottomSheetView = profileBottomSheet.findViewById(android.R.id.content);
-                            if (bottomSheetView != null) {
-                                MaterialButton connectButton = bottomSheetView.findViewById(R.id.connectAsanaButton);
-                                if (connectButton != null) {
-                                    updateAsanaConnectionUI(connectButton, false);
-                                }
-                            }
-                        }
-                    }
-                });
+                AsanaLoginFragment.handleOAuthResponse(data, this);
             }
         }
     }
