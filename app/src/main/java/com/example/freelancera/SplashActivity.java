@@ -3,6 +3,7 @@ package com.example.freelancera;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import androidx.appcompat.app.AppCompatActivity;
 import com.google.firebase.auth.FirebaseAuth;
 
@@ -16,7 +17,7 @@ public class SplashActivity extends AppCompatActivity {
 
         auth = FirebaseAuth.getInstance();
 
-        new Handler().postDelayed(() -> {
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
             Intent intent;
             if (auth.getCurrentUser() != null) {
                 // Użytkownik jest zalogowany

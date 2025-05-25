@@ -3,6 +3,7 @@ package com.example.freelancera;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Log;
 import android.widget.Button;
@@ -70,7 +71,7 @@ public class RegisterActivity extends AppCompatActivity {
         registerButton = findViewById(R.id.registerButton);
         goToLoginButton = findViewById(R.id.goToLoginButton);
         typewriterText = findViewById(R.id.typewriterText);
-        handler = new Handler();
+        handler = new Handler(Looper.getMainLooper());
 
         setupTypewriterAnimation();
         setupButtons();

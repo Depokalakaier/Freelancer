@@ -12,6 +12,7 @@ authApiImpl = "11.6.0"
 firebaseFirestore = "25.1.4"
 firebaseAuth = "23.2.1"
 firebaseStorage = "21.0.2"
+firebaseCommon = "21.0.0"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -26,6 +27,7 @@ auth-api-impl = { group = "com.google.android.gms", name = "auth-api-impl", vers
 firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore", version.ref = "firebaseFirestore" }
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth", version.ref = "firebaseAuth" }
 firebase-storage = { group = "com.google.firebase", name = "firebase-storage", version.ref = "firebaseStorage" }
+firebase-common = { group = "com.google.firebase", name = "firebase-common", version.ref = "firebaseCommon" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

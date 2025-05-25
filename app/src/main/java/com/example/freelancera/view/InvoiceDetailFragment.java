@@ -12,6 +12,7 @@ import android.widget.Toast;
 import com.example.freelancera.R;
 import com.example.freelancera.model.Invoice;
 import com.example.freelancera.util.JsonLoader;
+import android.os.Build;
 
 public class InvoiceDetailFragment extends Fragment {
 
@@ -43,7 +44,11 @@ public class InvoiceDetailFragment extends Fragment {
         paidSwitch = view.findViewById(R.id.switch_paid);
 
         if (getArguments() != null) {
-            invoice = getArguments().getParcelable(ARG_INVOICE);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                invoice = getArguments().getParcelable(ARG_INVOICE, Invoice.class);
+            } else {
+                invoice = getArguments().getParcelable(ARG_INVOICE);
+            }
         }
 
         if (invoice != null) {

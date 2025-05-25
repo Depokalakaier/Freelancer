@@ -19,21 +19,6 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Freelancera">
 
-        <!-- AppAuth / Asana Redirect URI -->
-        <activity
-            android:name="net.openid.appauth.RedirectUriReceiverActivity"
-            android:exported="true"
-            tools:ignore="Instantiatable">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" 
-                      android:host="depokalakaier.github.io"
-                      android:pathPattern="/Freelancer/.*" />
-            </intent-filter>
-        </activity>
-
         <!-- Ekran powitalny -->
         <activity
             android:name=".SplashActivity"
@@ -45,15 +30,40 @@
         </activity>
 
         <!-- Logowanie i rejestracja -->
-        <activity android:name=".LoginActivity" />
-        <activity android:name=".RegisterActivity" />
-        <activity android:name=".SettingsActivity" />
+        <activity 
+            android:name=".LoginActivity"
+            android:exported="false" />
+        <activity 
+            android:name=".RegisterActivity"
+            android:exported="false" />
+        <activity 
+            android:name=".SettingsActivity"
+            android:exported="false" />
 
         <!-- Główny ekran -->
-        <activity android:name=".MainActivity" />
-
-        <!-- (Opcjonalnie) Aktywność do obsługi logowania Asana, jeśli masz -->
-        <!-- <activity android:name=".AsanaLoginActivity" /> -->
+        <activity 
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask">
+            <!-- Intent filter dla HTTPS -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" 
+                      android:host="depokalakaier.github.io"
+                      android:pathPrefix="/Freelancer" />
+            </intent-filter>
+            <!-- Intent filter dla HTTP -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http" 
+                      android:host="depokalakaier.github.io"
+                      android:pathPrefix="/Freelancer" />
+            </intent-filter>
+        </activity>
 
         <!-- FileProvider do obsługi PDF -->
         <provider

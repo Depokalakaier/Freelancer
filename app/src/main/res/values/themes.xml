@@ -22,5 +22,7 @@
         <item name="android:colorBackground">@color/background</item>
         <item name="colorSurface">@color/surface</item>
         <item name="colorOnSurface">@color/on_surface</item>
+        <!-- Toolbar theme -->
+        <item name="toolbarStyle">@style/Widget.MaterialComponents.Toolbar.Primary</item>
     </style>
 </resources>

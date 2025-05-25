@@ -11,6 +11,7 @@ import androidx.fragment.app.Fragment;
 
 import android.os.Environment;
 import android.os.Handler;
+import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -37,7 +38,7 @@ public class TaskDetailFragment extends Fragment {
     private WorkTime workTime;
     private boolean isWorking = false;
     private long workStartMillis = 0;
-    private Handler handler = new Handler();
+    private Handler handler = new Handler(Looper.getMainLooper());
     private Runnable timerRunnable;
     private int sessionSeconds = 0;
 
