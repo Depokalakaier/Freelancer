@@ -32,15 +32,19 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageMetadata;
 import com.google.firebase.storage.StorageReference;
 import okhttp3.*;
-
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -328,7 +332,7 @@ public class MainActivity extends AppCompatActivity {
                     String token = document.getString("asanaToken");
                     Log.d(TAG, "Znaleziono token Asana, pobieram workspaces...");
                     
-                    // Najpierw pobierz workspaces
+                    // First get workspaces
                     com.example.freelancera.auth.AsanaApi.getWorkspaces(token, new okhttp3.Callback() {
                         @Override
                         public void onFailure(okhttp3.Call call, java.io.IOException e) {
@@ -345,14 +349,15 @@ public class MainActivity extends AppCompatActivity {
                             if (response.isSuccessful()) {
                                 try {
                                     JSONObject json = new JSONObject(responseBody);
-                                    JSONArray data = json.getJSONArray("data");
-                                    if (data.length() > 0) {
-                                        // Użyj pierwszego workspace do pobrania projektów
-                                        JSONObject workspace = data.getJSONObject(0);
+                                    JSONArray workspaces = json.getJSONArray("data");
+                                    
+                                    if (workspaces.length() > 0) {
+                                        // Get first workspace
+                                        JSONObject workspace = workspaces.getJSONObject(0);
                                         String workspaceId = workspace.getString("gid");
                                         Log.d(TAG, "Znaleziono workspace: " + workspaceId + ", pobieram projekty...");
                                         
-                                        // Pobierz projekty dla tego workspace
+                                        // Get projects for this workspace
                                         com.example.freelancera.auth.AsanaApi.getProjects(token, workspaceId, new okhttp3.Callback() {
                                             @Override
                                             public void onFailure(okhttp3.Call call, java.io.IOException e) {
@@ -372,12 +377,12 @@ public class MainActivity extends AppCompatActivity {
                                                         JSONArray projects = json.getJSONArray("data");
                                                         
                                                         if (projects.length() > 0) {
-                                                            // Użyj pierwszego projektu do pobrania zadań
+                                                            // Get first project
                                                             JSONObject project = projects.getJSONObject(0);
                                                             String projectId = project.getString("gid");
                                                             Log.d(TAG, "Znaleziono projekt: " + projectId + ", pobieram zadania...");
                                                             
-                                                            // Pobierz zadania dla tego projektu
+                                                            // Get tasks for this project
                                                             com.example.freelancera.auth.AsanaApi.getTasks(token, projectId, new okhttp3.Callback() {
                                                                 @Override
                                                                 public void onFailure(okhttp3.Call call, java.io.IOException e) {
@@ -392,24 +397,21 @@ public class MainActivity extends AppCompatActivity {
                                                                     Log.d(TAG, "Odpowiedź zadania: " + responseBody);
                                                                     
                                                                     if (response.isSuccessful()) {
-                                                                        runOnUiThread(() -> {
-                                                                            try {
-                                                                                JSONObject json = new JSONObject(responseBody);
-                                                                                JSONArray tasks = json.getJSONArray("data");
-                                                                                Toast.makeText(MainActivity.this, 
-                                                                                    "Pobrano " + tasks.length() + " zadań z Asana!", 
-                                                                                    Toast.LENGTH_SHORT).show();
+                                                                        try {
+                                                                            JSONObject json = new JSONObject(responseBody);
+                                                                            JSONArray tasks = json.getJSONArray("data");
+                                                                            
+                                                                            // Save tasks to Firestore
+                                                                            for (int i = 0; i < tasks.length(); i++) {
+                                                                                JSONObject taskJson = tasks.getJSONObject(i);
+                                                                                Task task = Task.fromAsanaJson(taskJson);
                                                                                 
-                                                                                // Konwertuj i zapisz zadania do Firestore
-                                                                                for (int i = 0; i < tasks.length(); i++) {
-                                                                                    JSONObject taskJson = tasks.getJSONObject(i);
-                                                                                    Task task = Task.fromAsanaJson(taskJson);
-                                                                                    
-                                                                                    // Zapisz do Firestore
+                                                                                if (task != null) {
+                                                                                    // Use asanaId as document ID to avoid duplicates
                                                                                     firestore.collection("users")
                                                                                         .document(user.getUid())
                                                                                         .collection("tasks")
-                                                                                        .document(task.getId())
+                                                                                        .document(task.getAsanaId())
                                                                                         .set(task)
                                                                                         .addOnSuccessListener(aVoid -> {
                                                                                             Log.d(TAG, "Zadanie zapisane: " + task.getName());
@@ -418,21 +420,31 @@ public class MainActivity extends AppCompatActivity {
                                                                                             Log.e(TAG, "Błąd zapisu zadania: " + e.getMessage());
                                                                                         });
                                                                                 }
+                                                                            }
+                                                                            
+                                                                            // After syncing from Asana, sync back any local changes
+                                                                            syncLocalChangesToAsana(token, projectId);
+                                                                            
+                                                                            runOnUiThread(() -> {
+                                                                                Toast.makeText(MainActivity.this, 
+                                                                                    "Zsynchronizowano " + tasks.length() + " zadań z Asana", 
+                                                                                    Toast.LENGTH_SHORT).show();
                                                                                 
-                                                                                // Odśwież widok zadań
+                                                                                // Refresh task list
                                                                                 getSupportFragmentManager()
                                                                                     .beginTransaction()
                                                                                     .replace(R.id.fragment_container, new TaskListFragment())
                                                                                     .commit();
-                                                                            } catch (Exception e) {
-                                                                                Log.e(TAG, "Błąd parsowania zadań: " + e.getMessage(), e);
-                                                                                Toast.makeText(MainActivity.this, 
-                                                                                    "Błąd parsowania zadań: " + e.getMessage(), 
-                                                                                    Toast.LENGTH_LONG).show();
-                                                                            }
-                                                                        });
+                                                                            });
+                                                                            
+                                                                        } catch (Exception e) {
+                                                                            Log.e(TAG, "Błąd przetwarzania zadań: " + e.getMessage(), e);
+                                                                            runOnUiThread(() -> Toast.makeText(MainActivity.this, 
+                                                                                "Błąd przetwarzania zadań: " + e.getMessage(), 
+                                                                                Toast.LENGTH_LONG).show());
+                                                                        }
                                                                     } else {
-                                                                        Log.e(TAG, "Błąd pobierania zadań: " + response.code() + " - " + responseBody);
+                                                                        Log.e(TAG, "Błąd pobierania zadań: " + response.code());
                                                                         runOnUiThread(() -> Toast.makeText(MainActivity.this, 
                                                                             "Błąd pobierania zadań: " + response.message(), 
                                                                             Toast.LENGTH_LONG).show());
@@ -440,9 +452,9 @@ public class MainActivity extends AppCompatActivity {
                                                                 }
                                                             });
                                                         } else {
-                                                            Log.d(TAG, "Brak projektów w workspace");
+                                                            Log.d(TAG, "Brak dostępnych projektów");
                                                             runOnUiThread(() -> Toast.makeText(MainActivity.this, 
-                                                                "Brak projektów w workspace", Toast.LENGTH_SHORT).show());
+                                                                "Brak dostępnych projektów", Toast.LENGTH_SHORT).show());
                                                         }
                                                     } catch (Exception e) {
                                                         Log.e(TAG, "Błąd parsowania projektów: " + e.getMessage(), e);
@@ -451,7 +463,7 @@ public class MainActivity extends AppCompatActivity {
                                                             Toast.LENGTH_LONG).show());
                                                     }
                                                 } else {
-                                                    Log.e(TAG, "Błąd pobierania projektów: " + response.code() + " - " + responseBody);
+                                                    Log.e(TAG, "Błąd pobierania projektów: " + response.code());
                                                     runOnUiThread(() -> Toast.makeText(MainActivity.this, 
                                                         "Błąd pobierania projektów: " + response.message(), 
                                                         Toast.LENGTH_LONG).show());
@@ -470,7 +482,7 @@ public class MainActivity extends AppCompatActivity {
                                         Toast.LENGTH_LONG).show());
                                 }
                             } else {
-                                Log.e(TAG, "Błąd pobierania workspaces: " + response.code() + " - " + responseBody);
+                                Log.e(TAG, "Błąd pobierania workspaces: " + response.code());
                                 runOnUiThread(() -> Toast.makeText(MainActivity.this, 
                                     "Błąd pobierania workspaces: " + response.message(), 
                                     Toast.LENGTH_LONG).show());
@@ -486,6 +498,129 @@ public class MainActivity extends AppCompatActivity {
                 Log.e(TAG, "Błąd pobierania tokenu z Firestore: " + e.getMessage(), e);
                 Toast.makeText(this, "Błąd pobierania tokenu: " + e.getMessage(), Toast.LENGTH_LONG).show();
             });
+    }
+
+    private void syncLocalChangesToAsana(String token, String projectId) {
+        if (user == null) return;
+
+        // Get all tasks that need syncing
+        firestore.collection("users")
+                .document(user.getUid())
+                .collection("tasks")
+                .whereEqualTo("needsSync", true)
+                .get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
+                        Task task = document.toObject(Task.class);
+                        
+                        if (task.getAsanaId() != null) {
+                            // Update existing task in Asana
+                            updateTaskInAsana(token, task);
+                        } else {
+                            // Create new task in Asana
+                            createTaskInAsana(token, projectId, task);
+                        }
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Błąd pobierania zadań do synchronizacji: " + e.getMessage());
+                });
+    }
+
+    private void updateTaskInAsana(String token, Task task) {
+        JSONObject taskData = new JSONObject();
+        try {
+            taskData.put("name", task.getName());
+            taskData.put("notes", task.getDescription());
+            taskData.put("completed", task.getStatus().equals("Ukończone"));
+            
+            if (task.getDueDate() != null) {
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+                taskData.put("due_on", sdf.format(task.getDueDate()));
+            }
+
+            com.example.freelancera.auth.AsanaApi.updateTask(token, task.getAsanaId(), taskData, new okhttp3.Callback() {
+                @Override
+                public void onFailure(okhttp3.Call call, java.io.IOException e) {
+                    Log.e(TAG, "Błąd aktualizacji zadania w Asana: " + e.getMessage());
+                }
+
+                @Override
+                public void onResponse(okhttp3.Call call, okhttp3.Response response) throws java.io.IOException {
+                    if (response.isSuccessful()) {
+                        // Mark task as synced
+                        task.setNeedsSync(false);
+                        task.setLastSyncDate(new Date());
+                        
+                        firestore.collection("users")
+                                .document(user.getUid())
+                                .collection("tasks")
+                                .document(task.getId())
+                                .set(task);
+                                
+                        Log.d(TAG, "Zadanie zaktualizowane w Asana: " + task.getName());
+                    } else {
+                        Log.e(TAG, "Błąd aktualizacji zadania w Asana: " + response.code());
+                    }
+                }
+            });
+        } catch (JSONException e) {
+            Log.e(TAG, "Błąd tworzenia JSON dla zadania: " + e.getMessage());
+        }
+    }
+
+    private void createTaskInAsana(String token, String projectId, Task task) {
+        JSONObject taskData = new JSONObject();
+        try {
+            taskData.put("name", task.getName());
+            taskData.put("notes", task.getDescription());
+            taskData.put("projects", new JSONArray().put(projectId));
+            taskData.put("completed", task.getStatus().equals("Ukończone"));
+            
+            if (task.getDueDate() != null) {
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+                taskData.put("due_on", sdf.format(task.getDueDate()));
+            }
+
+            com.example.freelancera.auth.AsanaApi.createTask(token, taskData, new okhttp3.Callback() {
+                @Override
+                public void onFailure(okhttp3.Call call, java.io.IOException e) {
+                    Log.e(TAG, "Błąd tworzenia zadania w Asana: " + e.getMessage());
+                }
+
+                @Override
+                public void onResponse(okhttp3.Call call, okhttp3.Response response) throws java.io.IOException {
+                    if (response.isSuccessful()) {
+                        String responseBody = response.body().string();
+                        try {
+                            JSONObject json = new JSONObject(responseBody);
+                            JSONObject data = json.getJSONObject("data");
+                            String asanaId = data.getString("gid");
+                            
+                            // Update task with Asana ID
+                            task.setAsanaId(asanaId);
+                            task.setNeedsSync(false);
+                            task.setLastSyncDate(new Date());
+                            task.setSource("asana");
+                            
+                            firestore.collection("users")
+                                    .document(user.getUid())
+                                    .collection("tasks")
+                                    .document(task.getId())
+                                    .set(task);
+                                    
+                            Log.d(TAG, "Zadanie utworzone w Asana: " + task.getName());
+                        } catch (JSONException e) {
+                            Log.e(TAG, "Błąd parsowania odpowiedzi z Asana: " + e.getMessage());
+                        }
+                    } else {
+                        Log.e(TAG, "Błąd tworzenia zadania w Asana: " + response.code());
+                    }
+                }
+            });
+        } catch (JSONException e) {
+            Log.e(TAG, "Błąd tworzenia JSON dla zadania: " + e.getMessage());
+        }
     }
 
     private void checkAsanaConnection() {

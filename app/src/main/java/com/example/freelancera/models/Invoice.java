@@ -1,99 +1,130 @@
 package com.example.freelancera.models;
 
-import java.io.Serializable;
+import android.os.Parcel;
+import android.os.Parcelable;
+import com.google.firebase.firestore.DocumentId;
 import java.util.Date;
-import java.util.Calendar;
 
-public class Invoice implements Serializable {
+public class Invoice implements Parcelable {
+    @DocumentId
     private String id;
     private String taskId;
-    private String taskName;
     private String clientName;
-    private String clientEmail;
-    private String clientAddress;
-    private double amount;
-    private double taxRate;
+    private String taskName;
+    private double hours; // Będzie uzupełniane gdy połączymy z Clockify
+    private double ratePerHour;
+    private double totalAmount;
     private Date issueDate;
     private Date dueDate;
-    private String status; // DRAFT, SENT, PAID
-    private String notes;
+    private boolean isPaid;
+    private String status; // "DRAFT", "SENT", "PAID"
 
     public Invoice() {
         // Required empty constructor for Firestore
     }
 
-    public Invoice(Task task) {
-        this.taskId = task.getId();
-        this.taskName = task.getName();
-        this.clientName = task.getClient();
-        this.amount = task.calculateTotal();
-        this.taxRate = 0.23; // 23% VAT domyślnie
+    public Invoice(String taskId, String clientName, String taskName, double ratePerHour) {
+        this.taskId = taskId;
+        this.clientName = clientName;
+        this.taskName = taskName;
+        this.ratePerHour = ratePerHour;
+        this.hours = 0.0; // Domyślnie 0 - będzie aktualizowane z Clockify
+        this.totalAmount = 0.0; // Będzie przeliczane po otrzymaniu godzin
         this.issueDate = new Date();
-        this.dueDate = new Date(System.currentTimeMillis() + (14 * 24 * 60 * 60 * 1000L)); // +14 dni
+        this.dueDate = new Date(System.currentTimeMillis() + 7 * 24 * 60 * 60 * 1000); // +7 dni
+        this.isPaid = false;
         this.status = "DRAFT";
     }
 
-    // Getters and Setters
+    protected Invoice(Parcel in) {
+        id = in.readString();
+        taskId = in.readString();
+        clientName = in.readString();
+        taskName = in.readString();
+        hours = in.readDouble();
+        ratePerHour = in.readDouble();
+        totalAmount = in.readDouble();
+        issueDate = new Date(in.readLong());
+        dueDate = new Date(in.readLong());
+        isPaid = in.readByte() != 0;
+        status = in.readString();
+    }
+
+    @Override
+    public void writeToParcel(Parcel dest, int flags) {
+        dest.writeString(id);
+        dest.writeString(taskId);
+        dest.writeString(clientName);
+        dest.writeString(taskName);
+        dest.writeDouble(hours);
+        dest.writeDouble(ratePerHour);
+        dest.writeDouble(totalAmount);
+        dest.writeLong(issueDate.getTime());
+        dest.writeLong(dueDate.getTime());
+        dest.writeByte((byte) (isPaid ? 1 : 0));
+        dest.writeString(status);
+    }
+
+    public static final Creator<Invoice> CREATOR = new Creator<Invoice>() {
+        @Override
+        public Invoice createFromParcel(Parcel in) {
+            return new Invoice(in);
+        }
+
+        @Override
+        public Invoice[] newArray(int size) {
+            return new Invoice[size];
+        }
+    };
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    // Gettery i settery
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
-
+    
     public String getTaskId() { return taskId; }
     public void setTaskId(String taskId) { this.taskId = taskId; }
-
-    public String getTaskName() { return taskName; }
-    public void setTaskName(String taskName) { this.taskName = taskName; }
-
+    
     public String getClientName() { return clientName; }
     public void setClientName(String clientName) { this.clientName = clientName; }
-
-    public String getClientEmail() { return clientEmail; }
-    public void setClientEmail(String clientEmail) { this.clientEmail = clientEmail; }
-
-    public String getClientAddress() { return clientAddress; }
-    public void setClientAddress(String clientAddress) { this.clientAddress = clientAddress; }
-
-    public double getAmount() { return amount; }
-    public void setAmount(double amount) { this.amount = amount; }
-
-    public double getTaxRate() { return taxRate; }
-    public void setTaxRate(double taxRate) { this.taxRate = taxRate; }
-
+    
+    public String getTaskName() { return taskName; }
+    public void setTaskName(String taskName) { this.taskName = taskName; }
+    
+    public double getHours() { return hours; }
+    public void setHours(double hours) { 
+        this.hours = hours;
+        recalculateTotal();
+    }
+    
+    public double getRatePerHour() { return ratePerHour; }
+    public void setRatePerHour(double ratePerHour) { 
+        this.ratePerHour = ratePerHour;
+        recalculateTotal();
+    }
+    
+    public double getTotalAmount() { return totalAmount; }
+    
     public Date getIssueDate() { return issueDate; }
     public void setIssueDate(Date issueDate) { this.issueDate = issueDate; }
-
+    
     public Date getDueDate() { return dueDate; }
     public void setDueDate(Date dueDate) { this.dueDate = dueDate; }
-
+    
+    public boolean isPaid() { return isPaid; }
+    public void setPaid(boolean paid) { 
+        isPaid = paid;
+        status = paid ? "PAID" : "DRAFT";
+    }
+    
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
 
-    public String getNotes() { return notes; }
-    public void setNotes(String notes) { this.notes = notes; }
-
-    // Helper methods
-    public double getTaxAmount() {
-        return amount * taxRate;
-    }
-
-    public double getTotalAmount() {
-        return amount + getTaxAmount();
-    }
-
-    public String getFormattedAmount() {
-        return String.format("%.2f zł", amount);
-    }
-
-    public String getFormattedTaxAmount() {
-        return String.format("%.2f zł", getTaxAmount());
-    }
-
-    public String getFormattedTotalAmount() {
-        return String.format("%.2f zł", getTotalAmount());
-    }
-
-    public String getFormattedInvoiceNumber() {
-        Calendar cal = Calendar.getInstance();
-        cal.setTime(issueDate);
-        return String.format("FV/%s/%d", id, cal.get(Calendar.YEAR));
+    private void recalculateTotal() {
+        this.totalAmount = this.hours * this.ratePerHour;
     }
 } 

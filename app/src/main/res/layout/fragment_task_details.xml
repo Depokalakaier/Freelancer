@@ -48,12 +48,24 @@
                         android:layout_height="wrap_content"
                         android:textSize="20sp"
                         android:textStyle="bold"
-                        android:layout_marginBottom="16dp"/>
+                        android:layout_marginBottom="8dp"/>
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Status z Asana:"
+                        android:text="Opis:"
+                        android:textStyle="bold"/>
+
+                    <TextView
+                        android:id="@+id/taskDescriptionTextView"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="8dp"/>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Status:"
                         android:textStyle="bold"/>
 
                     <TextView
@@ -65,14 +77,26 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Przypisane:"
+                        android:text="Klient:"
                         android:textStyle="bold"/>
 
                     <TextView
-                        android:id="@+id/taskAssigneeTextView"
+                        android:id="@+id/taskClientTextView"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="8dp"/>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Termin:"
+                        android:textStyle="bold"/>
+
+                    <TextView
+                        android:id="@+id/taskDueDateTextView"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="16dp"/>
 
                 </LinearLayout>
 
@@ -93,40 +117,34 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Klient:"
+                        android:text="Stawka godzinowa:"
                         android:textStyle="bold"/>
 
                     <TextView
-                        android:id="@+id/clientTextView"
+                        android:id="@+id/ratePerHourTextView"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Brak danych"
                         android:layout_marginBottom="8dp"/>
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Czas pracy:"
-                        android:textStyle="bold"/>
-
-                    <TextView
-                        android:id="@+id/workHoursTextView"
+                    <com.google.android.material.textfield.TextInputLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Brak danych"
-                        android:layout_marginBottom="8dp"/>
+                        android:hint="Nowa stawka godzinowa"
+                        android:layout_marginBottom="8dp">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Stawka:"
-                        android:textStyle="bold"/>
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/ratePerHourInput"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="numberDecimal"/>
 
-                    <TextView
-                        android:id="@+id/hourlyRateTextView"
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <Button
+                        android:id="@+id/updateRateButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="0.00 zł/h"/>
+                        android:text="Aktualizuj stawkę"/>
 
                 </LinearLayout>
 

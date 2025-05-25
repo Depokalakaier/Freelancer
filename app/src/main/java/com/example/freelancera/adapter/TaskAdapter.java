@@ -1,29 +1,24 @@
 package com.example.freelancera.adapter;
 
-import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import com.example.freelancera.R;
 import com.example.freelancera.models.Task;
+import java.text.SimpleDateFormat;
 import java.util.List;
+import java.util.Locale;
 
 public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder> {
+    private List<Task> tasks;
+    private final SimpleDateFormat dateFormat;
 
-    public interface OnTaskClickListener {
-        void onTaskClick(Task task);
-    }
-
-    private final List<Task> taskList;
-    private final OnTaskClickListener listener;
-
-    public TaskAdapter(List<Task> taskList, OnTaskClickListener listener) {
-        this.taskList = taskList;
-        this.listener = listener;
+    public TaskAdapter(List<Task> tasks) {
+        this.tasks = tasks;
+        this.dateFormat = new SimpleDateFormat("dd.MM.yyyy", Locale.getDefault());
     }
 
     @NonNull
@@ -36,51 +31,66 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
 
     @Override
     public void onBindViewHolder(@NonNull TaskViewHolder holder, int position) {
-        Task task = taskList.get(position);
-        holder.title.setText(task.getName());
-        holder.desc.setText(task.getDescription());
-        holder.status.setText(task.getStatus());
-
-        // Obsługa kliknięcia w całe zadanie
-        holder.itemView.setOnClickListener(v -> {
-            if (listener != null) {
-                listener.onTaskClick(task);
-            }
-        });
-
-        // Przycisk "Ukończ" tylko jeśli zadanie nie jest ukończone
-        if (!"Ukończone".equals(task.getStatus())) {
-            holder.completeBtn.setVisibility(View.VISIBLE);
-            holder.completeBtn.setOnClickListener(v -> {
-                task.setStatus("Ukończone");
-                notifyItemChanged(position);
-                // TODO: Zaktualizuj status w Firestore
-                updateTaskStatusInFirestore(v.getContext(), task);
-            });
-        } else {
-            holder.completeBtn.setVisibility(View.GONE);
-        }
-    }
-
-    private void updateTaskStatusInFirestore(Context context, Task task) {
-        // TODO: Implement Firestore update
+        Task task = tasks.get(position);
+        holder.bind(task);
     }
 
     @Override
     public int getItemCount() {
-        return taskList.size();
+        return tasks.size();
     }
 
-    static class TaskViewHolder extends RecyclerView.ViewHolder {
-        TextView title, desc, status;
-        Button completeBtn;
+    public void updateTasks(List<Task> newTasks) {
+        this.tasks = newTasks;
+        notifyDataSetChanged();
+    }
 
-        public TaskViewHolder(@NonNull View itemView) {
+    class TaskViewHolder extends RecyclerView.ViewHolder {
+        private final TextView taskNameTextView;
+        private final TextView taskStatusTextView;
+        private final TextView taskDueDateTextView;
+        private final TextView taskClientTextView;
+        private final TextView taskRateTextView;
+
+        TaskViewHolder(@NonNull View itemView) {
             super(itemView);
-            title = itemView.findViewById(R.id.task_title);
-            desc = itemView.findViewById(R.id.task_desc);
-            status = itemView.findViewById(R.id.task_status);
-            completeBtn = itemView.findViewById(R.id.task_complete_btn);
+            taskNameTextView = itemView.findViewById(R.id.taskNameTextView);
+            taskStatusTextView = itemView.findViewById(R.id.taskStatusTextView);
+            taskDueDateTextView = itemView.findViewById(R.id.taskDueDateTextView);
+            taskClientTextView = itemView.findViewById(R.id.taskClientTextView);
+            taskRateTextView = itemView.findViewById(R.id.taskRateTextView);
+        }
+
+        void bind(Task task) {
+            taskNameTextView.setText(task.getName());
+            taskStatusTextView.setText(task.getStatus());
+            
+            if (task.getDueDate() != null) {
+                taskDueDateTextView.setText(dateFormat.format(task.getDueDate()));
+            } else {
+                taskDueDateTextView.setText("Brak terminu");
+            }
+            
+            taskClientTextView.setText(task.getClient() != null ? task.getClient() : "Brak klienta");
+            taskRateTextView.setText(String.format(Locale.getDefault(), "%.2f zł/h", task.getRatePerHour()));
+
+            // Set status color
+            int statusColor;
+            switch (task.getStatus()) {
+                case "Nowe":
+                    statusColor = itemView.getContext().getColor(R.color.status_new);
+                    break;
+                case "W toku":
+                    statusColor = itemView.getContext().getColor(R.color.status_in_progress);
+                    break;
+                case "Ukończone":
+                    statusColor = itemView.getContext().getColor(R.color.status_completed);
+                    break;
+                default:
+                    statusColor = itemView.getContext().getColor(R.color.status_default);
+                    break;
+            }
+            taskStatusTextView.setTextColor(statusColor);
         }
     }
 }

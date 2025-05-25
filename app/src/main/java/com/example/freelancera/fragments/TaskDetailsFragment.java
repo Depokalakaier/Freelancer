@@ -1,147 +1,147 @@
 package com.example.freelancera.fragments;
 
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.LayoutInflater;
-import android.view.Menu;
-import android.view.MenuInflater;
-import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.TextView;
-import androidx.activity.OnBackPressedCallback;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.widget.Toolbar;
+import android.widget.Toast;
 import androidx.fragment.app.Fragment;
 import com.example.freelancera.R;
 import com.example.freelancera.models.Task;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
+import java.text.SimpleDateFormat;
+import java.util.Locale;
 
 public class TaskDetailsFragment extends Fragment {
     private Task task;
     private TextView taskNameTextView;
+    private TextView taskDescriptionTextView;
     private TextView taskStatusTextView;
-    private TextView taskAssigneeTextView;
-    private TextView clientTextView;
-    private TextView workHoursTextView;
-    private TextView hourlyRateTextView;
+    private TextView taskClientTextView;
+    private TextView taskDueDateTextView;
+    private TextView ratePerHourTextView;
+    private EditText ratePerHourInput;
+    private Button updateRateButton;
     private FirebaseFirestore firestore;
-    private FirebaseAuth auth;
+    private FirebaseUser user;
 
-    public static TaskDetailsFragment newInstance(Task task) {
+    public static TaskDetailsFragment newInstance(String taskId) {
         TaskDetailsFragment fragment = new TaskDetailsFragment();
         Bundle args = new Bundle();
-        args.putSerializable("task", task);
+        args.putString("taskId", taskId);
         fragment.setArguments(args);
         return fragment;
     }
 
     @Override
-    public void onCreate(@Nullable Bundle savedInstanceState) {
+    public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (getArguments() != null) {
-            task = (Task) getArguments().getSerializable("task", Task.class);
-        }
         firestore = FirebaseFirestore.getInstance();
-        auth = FirebaseAuth.getInstance();
+        user = FirebaseAuth.getInstance().getCurrentUser();
 
-        // Handle back press
-        requireActivity().getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
-            @Override
-            public void handleOnBackPressed() {
-                getParentFragmentManager().popBackStack();
-            }
-        });
+        if (getArguments() != null && getArguments().containsKey("taskId")) {
+            String taskId = getArguments().getString("taskId");
+            loadTask(taskId);
+        }
     }
 
-    @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_task_details, container, false);
 
-        Toolbar toolbar = view.findViewById(R.id.toolbar);
-        toolbar.setNavigationOnClickListener(v -> getParentFragmentManager().popBackStack());
-        toolbar.setOnMenuItemClickListener(this::handleMenuItemClick);
-
+        // Inicjalizacja widoków
         taskNameTextView = view.findViewById(R.id.taskNameTextView);
+        taskDescriptionTextView = view.findViewById(R.id.taskDescriptionTextView);
         taskStatusTextView = view.findViewById(R.id.taskStatusTextView);
-        taskAssigneeTextView = view.findViewById(R.id.taskAssigneeTextView);
-        clientTextView = view.findViewById(R.id.clientTextView);
-        workHoursTextView = view.findViewById(R.id.workHoursTextView);
-        hourlyRateTextView = view.findViewById(R.id.hourlyRateTextView);
+        taskClientTextView = view.findViewById(R.id.taskClientTextView);
+        taskDueDateTextView = view.findViewById(R.id.taskDueDateTextView);
+        ratePerHourTextView = view.findViewById(R.id.ratePerHourTextView);
+        ratePerHourInput = view.findViewById(R.id.ratePerHourInput);
+        updateRateButton = view.findViewById(R.id.updateRateButton);
 
-        updateUI();
+        // Konfiguracja przycisku aktualizacji stawki
+        updateRateButton.setOnClickListener(v -> updateRatePerHour());
 
         return view;
     }
 
-    private boolean handleMenuItemClick(MenuItem item) {
-        if (item.getItemId() == R.id.action_edit) {
-            showEditDialog();
-            return true;
-        }
-        return false;
+    private void loadTask(String taskId) {
+        if (user == null) return;
+
+        firestore.collection("users")
+                .document(user.getUid())
+                .collection("tasks")
+                .document(taskId)
+                .get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    task = documentSnapshot.toObject(Task.class);
+                    if (task != null) {
+                        updateUI();
+                    }
+                })
+                .addOnFailureListener(e -> 
+                    Toast.makeText(getContext(), 
+                        "Błąd podczas ładowania zadania: " + e.getMessage(), 
+                        Toast.LENGTH_LONG).show());
     }
 
     private void updateUI() {
-        if (task != null) {
-            taskNameTextView.setText(task.getName());
-            taskStatusTextView.setText(task.getStatus());
-            taskAssigneeTextView.setText(task.getAssignee());
-            clientTextView.setText(task.getClient() != null ? task.getClient() : "Brak danych");
-            workHoursTextView.setText(task.getWorkHours() != null ? task.getFormattedWorkHours() : "Brak danych");
-            hourlyRateTextView.setText(task.getFormattedHourlyRate());
+        if (task == null) return;
+
+        taskNameTextView.setText(task.getName());
+        taskDescriptionTextView.setText(task.getDescription());
+        taskStatusTextView.setText(task.getStatus());
+        taskClientTextView.setText(task.getClient());
+
+        SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy", Locale.getDefault());
+        if (task.getDueDate() != null) {
+            taskDueDateTextView.setText(sdf.format(task.getDueDate()));
         }
+
+        String rateText = String.format(Locale.getDefault(), "%.2f zł/h", task.getRatePerHour());
+        ratePerHourTextView.setText(rateText);
+        ratePerHourInput.setText(String.valueOf(task.getRatePerHour()));
     }
 
-    private void showEditDialog() {
-        View dialogView = LayoutInflater.from(requireContext())
-                .inflate(R.layout.dialog_edit_task, null);
+    private void updateRatePerHour() {
+        if (task == null || user == null) return;
 
-        TextInputEditText clientInput = dialogView.findViewById(R.id.clientInput);
-        TextInputEditText hourlyRateInput = dialogView.findViewById(R.id.hourlyRateInput);
+        String rateStr = ratePerHourInput.getText().toString();
+        if (TextUtils.isEmpty(rateStr)) {
+            Toast.makeText(getContext(), "Podaj stawkę godzinową", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-        clientInput.setText(task.getClient());
-        hourlyRateInput.setText(String.valueOf(task.getHourlyRate()));
+        try {
+            double rate = Double.parseDouble(rateStr);
+            if (rate <= 0) {
+                Toast.makeText(getContext(), "Stawka musi być większa od 0", Toast.LENGTH_SHORT).show();
+                return;
+            }
 
-        new MaterialAlertDialogBuilder(requireContext())
-                .setTitle("Edytuj szczegóły zadania")
-                .setView(dialogView)
-                .setPositiveButton("Zapisz", (dialog, which) -> {
-                    String client = clientInput.getText().toString();
-                    String hourlyRateStr = hourlyRateInput.getText().toString();
-                    double hourlyRate = 0.0;
-                    try {
-                        hourlyRate = Double.parseDouble(hourlyRateStr);
-                    } catch (NumberFormatException e) {
-                        // Ignore parse error and use default 0.0
-                    }
+            task.setRatePerHour(rate);
+            firestore.collection("users")
+                    .document(user.getUid())
+                    .collection("tasks")
+                    .document(task.getId())
+                    .update("ratePerHour", rate)
+                    .addOnSuccessListener(aVoid -> {
+                        Toast.makeText(getContext(), "Zaktualizowano stawkę", Toast.LENGTH_SHORT).show();
+                        updateUI();
+                    })
+                    .addOnFailureListener(e -> 
+                        Toast.makeText(getContext(), 
+                            "Błąd aktualizacji: " + e.getMessage(), 
+                            Toast.LENGTH_LONG).show());
 
-                    task.setClient(client.isEmpty() ? null : client);
-                    task.setHourlyRate(hourlyRate);
-
-                    // Zapisz zmiany w Firestore
-                    if (auth.getCurrentUser() != null) {
-                        DocumentReference taskRef = firestore
-                            .collection("users")
-                            .document(auth.getCurrentUser().getUid())
-                            .collection("tasks")
-                            .document(task.getId());
-
-                        taskRef.update(
-                            "client", task.getClient(),
-                            "hourlyRate", task.getHourlyRate()
-                        ).addOnSuccessListener(unused -> {
-                            updateUI();
-                        });
-                    }
-                })
-                .setNegativeButton("Anuluj", null)
-                .show();
+        } catch (NumberFormatException e) {
+            Toast.makeText(getContext(), "Nieprawidłowy format stawki", Toast.LENGTH_SHORT).show();
+        }
     }
 } 
