@@ -41,6 +41,7 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation ("net.openid:appauth:0.11.1")
+    implementation("androidx.browser:browser:1.7.0")  // Chrome Custom Tabs
     // OkHttp (do logowania zapytań – pomocne przy debugowaniu)
     implementation("com.squareup.okhttp3:logging-interceptor:4.9.3")
     implementation ("androidx.appcompat:appcompat:1.6.1")

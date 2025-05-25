@@ -9,59 +9,36 @@
         }
 
         function handleCallback() {
-            const code = getQueryParam('code');
-            const state = getQueryParam('state');
-            const error = getQueryParam('error');
-            const error_description = getQueryParam('error_description');
-
-            if (error) {
-                document.getElementById('status').innerText = 'Error: ' + error + '\n' + error_description;
-                return;
-            }
-
-            if (!code) {
-                document.getElementById('status').innerText = 'No authorization code received';
-                return;
-            }
-
-            // Exchange code for token
-            fetch('https://app.asana.com/-/oauth_token', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: new URLSearchParams({
-                    'grant_type': 'authorization_code',
-                    'client_id': '1210368184403679',
-                    'client_secret': '37984949b203b0a9ad86bc7b2d1d4d41',
-                    'redirect_uri': 'https://depokalakaier.github.io/Freelancer/',
-                    'code': code
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    document.getElementById('status').innerText = 'Token Error: ' + data.error + '\n' + data.error_description;
-                    return;
+            try {
+                // Get all parameters from URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const params = {};
+                
+                // Convert URLSearchParams to object
+                for (const [key, value] of urlParams.entries()) {
+                    params[key] = value;
                 }
 
-                // Store tokens and user info
-                const result = {
-                    access_token: data.access_token,
-                    id_token: data.id_token,
-                    refresh_token: data.refresh_token,
-                    email: data.data?.email
-                };
+                // Create redirect URL with all parameters
+                const appParams = new URLSearchParams();
+                for (const [key, value] of Object.entries(params)) {
+                    appParams.append(key, value);
+                }
 
-                // Try to send back to Android app
-                const redirectUrl = `freelancera://oauth/callback?${new URLSearchParams(result).toString()}`;
-                window.location.href = redirectUrl;
-
-                document.getElementById('status').innerText = 'Success! Redirecting back to app...';
-            })
-            .catch(error => {
-                document.getElementById('status').innerText = 'Error exchanging code: ' + error.message;
-            });
+                const redirectUrl = `freelancera://oauth/callback?${appParams.toString()}`;
+                
+                // Update status and redirect
+                document.getElementById('status').innerText = 'Przekierowuję do aplikacji...';
+                console.log('Redirecting to:', redirectUrl);
+                
+                // Add small delay to ensure the status is shown
+                setTimeout(() => {
+                    window.location.href = redirectUrl;
+                }, 100);
+            } catch (error) {
+                document.getElementById('status').innerText = 'Błąd: ' + error.message;
+                console.error('Error in handleCallback:', error);
+            }
         }
 
         // Run when page loads
@@ -94,6 +71,6 @@
 </head>
 <body>
     <h1>Freelancera OAuth Callback</h1>
-    <p id="status">Processing...</p>
+    <p id="status">Przetwarzanie...</p>
 </body>
 </html> 

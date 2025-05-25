@@ -10,6 +10,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    
     <application
         android:name=".FreelanceraApp"
         android:allowBackup="true"
@@ -45,28 +46,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask">
-            <!-- Intent filter dla HTTPS -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" 
-                      android:host="depokalakaier.github.io"
-                      android:path="/Freelancer/" />
-            </intent-filter>
-            <!-- Intent filter dla HTTP -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="http" 
-                      android:host="depokalakaier.github.io"
-                      android:path="/Freelancer/" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
+            <!-- OAuth callback -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -89,8 +69,7 @@
                 android:resource="@xml/file_paths"/>
         </provider>
 
-        <!-- Inne providery/biblioteki, jeśli używasz -->
-        <!-- Przykład dla AndroidX Startup -->
+        <!-- Inne providery/biblioteki -->
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
@@ -105,7 +84,7 @@
                 android:name="androidx.profileinstaller.ProfileInstallerInitializer"
                 android:value="androidx.startup" />
         </provider>
-        <!-- Profile Install Receiver (jeśli masz) -->
+
         <receiver
             android:name="androidx.profileinstaller.ProfileInstallReceiver"
             android:directBootAware="false"
