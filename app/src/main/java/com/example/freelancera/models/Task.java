@@ -111,6 +111,8 @@ public class Task implements Parcelable {
             String status = json.getBoolean("completed") ? "Ukończone" : "Nowe";
             
             Task task = new Task(gid, name, status);
+            task.setId(gid);
+            task.setAsanaId(gid);
             task.source = "asana";
             task.needsSync = false;
             task.lastSyncDate = new Date();
@@ -129,7 +131,9 @@ public class Task implements Parcelable {
                     Log.e(TAG, "Error parsing due date from Asana", e);
                 }
             }
-            
+            if (task.getId() == null) {
+                Log.e(TAG, "fromAsanaJson: id (gid) is null! JSON: " + json.toString());
+            }
             return task;
         } catch (JSONException e) {
             Log.e(TAG, "Error parsing Asana task JSON", e);
