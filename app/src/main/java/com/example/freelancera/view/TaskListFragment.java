@@ -181,7 +181,7 @@ public class TaskListFragment extends Fragment {
     private void fetchTasksFromAsana(String token, String uid, String workspaceId) {
         OkHttpClient client = new OkHttpClient();
         Request request = new Request.Builder()
-            .url("https://app.asana.com/api/1.0/tasks?assignee=me&workspace=" + workspaceId + "&opt_fields=gid,name,completed,due_on,created_at,notes")
+            .url("https://app.asana.com/api/1.0/tasks?assignee=me&workspace=" + workspaceId + "&opt_fields=gid")
             .addHeader("Authorization", "Bearer " + token)
             .build();
         client.newCall(request).enqueue(new Callback() {
@@ -196,7 +196,24 @@ public class TaskListFragment extends Fragment {
             public void onResponse(Call call, Response response) throws IOException {
                 if (response.isSuccessful()) {
                     String json = response.body().string();
-                    saveTasksToFirestore(json, uid);
+                    try {
+                        JSONObject jsonObject = new JSONObject(json);
+                        JSONArray tasks = jsonObject.getJSONArray("data");
+                        if (tasks.length() == 0) {
+                            swipeRefreshLayout.post(() -> {
+                                swipeRefreshLayout.setRefreshing(false);
+                                Toast.makeText(getContext(), "Brak zadań w Asana", Toast.LENGTH_LONG).show();
+                            });
+                            return;
+                        }
+                        // Pobierz szczegóły każdego zadania
+                        fetchTaskDetailsAndSave(tasks, token, uid);
+                    } catch (JSONException e) {
+                        swipeRefreshLayout.post(() -> {
+                            swipeRefreshLayout.setRefreshing(false);
+                            Toast.makeText(getContext(), "Błąd parsowania listy zadań: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                        });
+                    }
                 } else {
                     swipeRefreshLayout.post(() -> {
                         swipeRefreshLayout.setRefreshing(false);
@@ -207,51 +224,144 @@ public class TaskListFragment extends Fragment {
         });
     }
 
-    private void saveTasksToFirestore(String jsonResponse, String uid) {
-        try {
-            JSONObject jsonObject = new JSONObject(jsonResponse);
-            JSONArray tasks = jsonObject.getJSONArray("data");
-            FirebaseFirestore db = FirebaseFirestore.getInstance();
-            CollectionReference taskCollection = db.collection("users").document(uid).collection("tasks");
-            deleteOldTasks(taskCollection, () -> {
-                for (int i = 0; i < tasks.length(); i++) {
-                    try {
-                        JSONObject task = tasks.getJSONObject(i);
-                        Map<String, Object> taskMap = new HashMap<>();
-                        taskMap.put("id", task.getString("gid"));
-                        taskMap.put("name", task.getString("name"));
-                        // Domyślne wartości, by nie było nulli
-                        taskMap.put("status", task.has("completed") && task.getBoolean("completed") ? "Ukończone" : "Nowe");
-                        taskMap.put("client", "Brak klienta");
-                        taskMap.put("ratePerHour", 0.0);
-                        // Termin wykonania
-                        if (task.has("due_on") && !task.isNull("due_on")) {
-                            taskMap.put("dueDate", task.getString("due_on"));
-                        } else {
-                            taskMap.put("dueDate", null);
+    private void fetchTaskDetailsAndSave(JSONArray tasks, String token, String uid) {
+        OkHttpClient client = new OkHttpClient();
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
+        CollectionReference taskCollection = db.collection("users").document(uid).collection("tasks");
+        deleteOldTasks(taskCollection, () -> {
+            AtomicInteger counter = new AtomicInteger(0);
+            for (int i = 0; i < tasks.length(); i++) {
+                try {
+                    String gid = tasks.getJSONObject(i).getString("gid");
+                    Request detailRequest = new Request.Builder()
+                            .url("https://app.asana.com/api/1.0/tasks/" + gid + "?opt_fields=gid,name,completed,due_on,created_at,projects,assignee")
+                            .addHeader("Authorization", "Bearer " + token)
+                            .build();
+                    client.newCall(detailRequest).enqueue(new Callback() {
+                        @Override
+                        public void onFailure(Call call, IOException e) {
+                            if (counter.incrementAndGet() == tasks.length()) {
+                                loadTasksFromFirestore(uid);
+                            }
                         }
-                        // Data utworzenia
-                        if (task.has("created_at") && !task.isNull("created_at")) {
-                            taskMap.put("createdAt", task.getString("created_at"));
-                        } else {
-                            taskMap.put("createdAt", null);
+                        @Override
+                        public void onResponse(Call call, Response response) throws IOException {
+                            if (response.isSuccessful()) {
+                                try {
+                                    JSONObject detailJson = new JSONObject(response.body().string());
+                                    JSONObject task = detailJson.getJSONObject("data");
+                                    // Pobierz stories i znajdź datę przypisania do użytkownika
+                                    fetchAssignmentDateAndSave(task, token, taskCollection, counter, tasks.length(), uid);
+                                } catch (JSONException e) {
+                                    Log.e("JSON", "Błąd parsowania szczegółów zadania", e);
+                                    if (counter.incrementAndGet() == tasks.length()) {
+                                        loadTasksFromFirestore(uid);
+                                    }
+                                }
+                            } else {
+                                if (counter.incrementAndGet() == tasks.length()) {
+                                    loadTasksFromFirestore(uid);
+                                }
+                            }
                         }
-                        taskCollection.document(task.getString("gid"))
-                            .set(taskMap)
-                            .addOnSuccessListener(aVoid -> Log.d("Firestore", "Zapisano zadanie"))
-                            .addOnFailureListener(e -> Log.e("Firestore", "Błąd zapisu", e));
-                    } catch (JSONException e) {
-                        Log.e("JSON", "Błąd parsowania zadania", e);
+                    });
+                } catch (JSONException e) {
+                    if (counter.incrementAndGet() == tasks.length()) {
+                        loadTasksFromFirestore(uid);
                     }
                 }
-                // Po zapisie pobierz i wyświetl
-                loadTasksFromFirestore(uid);
-            });
+            }
+        });
+    }
+
+    private void fetchAssignmentDateAndSave(JSONObject task, String token, CollectionReference taskCollection, AtomicInteger counter, int total, String uid) {
+        OkHttpClient client = new OkHttpClient();
+        String gid = task.optString("gid");
+        Request storiesRequest = new Request.Builder()
+                .url("https://app.asana.com/api/1.0/tasks/" + gid + "/stories?opt_fields=type,created_at,resource_subtype,text,assignee")
+                .addHeader("Authorization", "Bearer " + token)
+                .build();
+        client.newCall(storiesRequest).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                saveTaskWithStatus(task, null, taskCollection, counter, total, uid);
+            }
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                String assignedAt = null;
+                if (response.isSuccessful()) {
+                    try {
+                        JSONObject json = new JSONObject(response.body().string());
+                        JSONArray stories = json.getJSONArray("data");
+                        for (int i = 0; i < stories.length(); i++) {
+                            JSONObject story = stories.getJSONObject(i);
+                            if ("system".equals(story.optString("type")) && "assigned".equals(story.optString("resource_subtype"))) {
+                                assignedAt = story.optString("created_at");
+                                break;
+                            }
+                        }
+                    } catch (JSONException e) {
+                        // ignoruj
+                    }
+                }
+                saveTaskWithStatus(task, assignedAt, taskCollection, counter, total, uid);
+            }
+        });
+    }
+
+    private void saveTaskWithStatus(JSONObject task, String createdAt, CollectionReference taskCollection, AtomicInteger counter, int total, String uid) {
+        try {
+            Map<String, Object> taskMap = new HashMap<>();
+            taskMap.put("id", task.getString("gid"));
+            taskMap.put("name", task.getString("name"));
+            // Status: Ukończone jeśli completed, w przeciwnym razie data utworzenia lub "Nowe"
+            String status;
+            boolean completed = task.has("completed") && task.getBoolean("completed");
+            if (completed) {
+                status = "Ukończone";
+            } else if (createdAt != null) {
+                try {
+                    java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.getDefault());
+                    java.util.Date createdDate = sdf.parse(createdAt);
+                    java.util.Calendar cal1 = java.util.Calendar.getInstance();
+                    java.util.Calendar cal2 = java.util.Calendar.getInstance();
+                    cal2.setTime(createdDate);
+                    boolean isToday = cal1.get(java.util.Calendar.YEAR) == cal2.get(java.util.Calendar.YEAR)
+                            && cal1.get(java.util.Calendar.DAY_OF_YEAR) == cal2.get(java.util.Calendar.DAY_OF_YEAR);
+                    if (isToday) {
+                        status = "Nowe";
+                    } else {
+                        java.text.SimpleDateFormat outFormat = new java.text.SimpleDateFormat("dd.MM.yyyy", java.util.Locale.getDefault());
+                        status = outFormat.format(createdDate);
+                    }
+                } catch (Exception e) {
+                    status = "Nowe";
+                }
+            } else {
+                status = "Nowe";
+            }
+            taskMap.put("status", status);
+            taskMap.put("client", "Brak klienta");
+            taskMap.put("ratePerHour", 0.0);
+            if (task.has("due_on") && !task.isNull("due_on")) {
+                taskMap.put("dueDate", task.getString("due_on"));
+            } else {
+                taskMap.put("dueDate", null);
+            }
+            if (createdAt != null) {
+                taskMap.put("createdAt", createdAt);
+            } else {
+                taskMap.put("createdAt", null);
+            }
+            taskCollection.document(task.getString("gid"))
+                    .set(taskMap)
+                    .addOnSuccessListener(aVoid -> Log.d("Firestore", "Zapisano zadanie"))
+                    .addOnFailureListener(e -> Log.e("Firestore", "Błąd zapisu", e));
         } catch (JSONException e) {
-            swipeRefreshLayout.post(() -> {
-                swipeRefreshLayout.setRefreshing(false);
-                Toast.makeText(getContext(), "Błąd przetwarzania danych z Asany", Toast.LENGTH_LONG).show();
-            });
+            Log.e("JSON", "Błąd parsowania zadania", e);
+        }
+        if (counter.incrementAndGet() == total) {
+            loadTasksFromFirestore(uid);
         }
     }
 
