@@ -157,7 +157,7 @@ public class Task implements Parcelable {
         markForSync();
     }
 
-    public String getStatus() { return status; }
+    public String getStatus() { return status != null ? status : "Nowe"; }
     public void setStatus(String status) { 
         this.status = status;
         if ("Ukończone".equals(status)) {
@@ -166,7 +166,7 @@ public class Task implements Parcelable {
         markForSync();
     }
 
-    public String getClient() { return client; }
+    public String getClient() { return client != null ? client : "Brak klienta"; }
     public void setClient(String client) { 
         this.client = client;
         markForSync();
@@ -179,8 +179,17 @@ public class Task implements Parcelable {
     }
 
     public Date getDueDate() { return dueDate; }
-    public void setDueDate(Date dueDate) { 
-        this.dueDate = dueDate;
+    public void setDueDate(Object dueDate) { 
+        if (dueDate instanceof Date) {
+            this.dueDate = (Date) dueDate;
+        } else if (dueDate instanceof String) {
+            try {
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+                this.dueDate = sdf.parse((String) dueDate);
+            } catch (ParseException e) {
+                Log.e(TAG, "Error parsing due date from Firestore String", e);
+            }
+        }
         markForSync();
     }
 
