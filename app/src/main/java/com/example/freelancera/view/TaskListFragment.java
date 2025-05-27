@@ -181,7 +181,7 @@ public class TaskListFragment extends Fragment {
     private void fetchTasksFromAsana(String token, String uid, String workspaceId) {
         OkHttpClient client = new OkHttpClient();
         Request request = new Request.Builder()
-            .url("https://app.asana.com/api/1.0/tasks?assignee=me&workspace=" + workspaceId)
+            .url("https://app.asana.com/api/1.0/tasks?assignee=me&workspace=" + workspaceId + "&opt_fields=gid,name,completed,due_on,created_at,notes")
             .addHeader("Authorization", "Bearer " + token)
             .build();
         client.newCall(request).enqueue(new Callback() {
@@ -224,10 +224,17 @@ public class TaskListFragment extends Fragment {
                         taskMap.put("status", task.has("completed") && task.getBoolean("completed") ? "Ukończone" : "Nowe");
                         taskMap.put("client", "Brak klienta");
                         taskMap.put("ratePerHour", 0.0);
+                        // Termin wykonania
                         if (task.has("due_on") && !task.isNull("due_on")) {
                             taskMap.put("dueDate", task.getString("due_on"));
                         } else {
                             taskMap.put("dueDate", null);
+                        }
+                        // Data utworzenia
+                        if (task.has("created_at") && !task.isNull("created_at")) {
+                            taskMap.put("createdAt", task.getString("created_at"));
+                        } else {
+                            taskMap.put("createdAt", null);
                         }
                         taskCollection.document(task.getString("gid"))
                             .set(taskMap)
@@ -270,9 +277,31 @@ public class TaskListFragment extends Fragment {
                 for (DocumentSnapshot doc : querySnapshot.getDocuments()) {
                     String id = doc.getString("id");
                     String name = doc.getString("name");
+                    String status = doc.getString("status");
+                    String dueDateStr = doc.getString("dueDate");
+                    String createdAtStr = doc.getString("createdAt");
                     Task task = new Task();
                     task.setId(id);
                     task.setName(name);
+                    task.setStatus(status);
+                    // Parsowanie dueDate
+                    if (dueDateStr != null) {
+                        try {
+                            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault());
+                            task.setDueDate(sdf.parse(dueDateStr));
+                        } catch (java.text.ParseException e) {
+                            task.setDueDate((java.util.Date) null);
+                        }
+                    }
+                    // Parsowanie createdAt
+                    if (createdAtStr != null) {
+                        try {
+                            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.getDefault());
+                            task.setCreatedAt(sdf.parse(createdAtStr));
+                        } catch (java.text.ParseException e) {
+                            // Ignoruj błąd
+                        }
+                    }
                     allTasks.add(task);
                 }
                 swipeRefreshLayout.setRefreshing(false);

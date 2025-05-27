@@ -63,34 +63,54 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
 
         void bind(Task task) {
             taskNameTextView.setText(task.getName());
-            taskStatusTextView.setText(task.getStatus());
-            
+            String statusText;
+            int statusColor;
+            if ("Ukończone".equals(task.getStatus())) {
+                statusText = "Ukończone";
+                statusColor = itemView.getContext().getColor(R.color.status_completed);
+            } else {
+                java.util.Calendar cal1 = java.util.Calendar.getInstance();
+                java.util.Calendar cal2 = java.util.Calendar.getInstance();
+                if (task.getCreatedAt() != null) {
+                    cal2.setTime(task.getCreatedAt());
+                    boolean isToday = cal1.get(java.util.Calendar.YEAR) == cal2.get(java.util.Calendar.YEAR)
+                            && cal1.get(java.util.Calendar.DAY_OF_YEAR) == cal2.get(java.util.Calendar.DAY_OF_YEAR);
+                    if (isToday) {
+                        statusText = "Nowe";
+                    } else {
+                        statusText = dateFormat.format(task.getCreatedAt());
+                    }
+                } else {
+                    statusText = "Nowe";
+                }
+                statusColor = itemView.getContext().getColor(R.color.status_new);
+            }
+            taskStatusTextView.setText(statusText);
+            taskStatusTextView.setTextColor(statusColor);
+
             if (task.getDueDate() != null) {
-                taskDueDateTextView.setText(dateFormat.format(task.getDueDate()));
+                java.util.Calendar today = java.util.Calendar.getInstance();
+                java.util.Calendar due = java.util.Calendar.getInstance();
+                due.setTime(task.getDueDate());
+                boolean isToday = today.get(java.util.Calendar.YEAR) == due.get(java.util.Calendar.YEAR)
+                        && today.get(java.util.Calendar.DAY_OF_YEAR) == due.get(java.util.Calendar.DAY_OF_YEAR);
+                if (isToday) {
+                    taskDueDateTextView.setText("Do dzisiaj");
+                    taskDueDateTextView.setTextColor(itemView.getContext().getColor(R.color.status_in_progress));
+                } else if (due.after(today)) {
+                    taskDueDateTextView.setText(dateFormat.format(task.getDueDate()));
+                    taskDueDateTextView.setTextColor(itemView.getContext().getColor(R.color.status_in_progress));
+                } else {
+                    taskDueDateTextView.setText(dateFormat.format(task.getDueDate()) + "  Po terminie");
+                    taskDueDateTextView.setTextColor(itemView.getContext().getColor(android.R.color.holo_red_dark));
+                }
             } else {
                 taskDueDateTextView.setText("Brak terminu");
+                taskDueDateTextView.setTextColor(itemView.getContext().getColor(R.color.status_default));
             }
-            
+
             taskClientTextView.setText(task.getClient() != null ? task.getClient() : "Brak klienta");
             taskRateTextView.setText(String.format(Locale.getDefault(), "%.2f zł/h", task.getRatePerHour()));
-
-            // Set status color
-            int statusColor;
-            switch (task.getStatus()) {
-                case "Nowe":
-                    statusColor = itemView.getContext().getColor(R.color.status_new);
-                    break;
-                case "W toku":
-                    statusColor = itemView.getContext().getColor(R.color.status_in_progress);
-                    break;
-                case "Ukończone":
-                    statusColor = itemView.getContext().getColor(R.color.status_completed);
-                    break;
-                default:
-                    statusColor = itemView.getContext().getColor(R.color.status_default);
-                    break;
-            }
-            taskStatusTextView.setTextColor(statusColor);
         }
     }
 }

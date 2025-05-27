@@ -29,6 +29,7 @@ public class Task implements Parcelable {
     private String source; // "asana" lub "local"
     private boolean needsSync; // true jeśli zadanie wymaga synchronizacji z Asana
     private Date lastSyncDate; // data ostatniej synchronizacji
+    private Date createdAt;
 
     public Task() {
         // Required empty constructor for Firestore
@@ -216,6 +217,9 @@ public class Task implements Parcelable {
 
     public Date getLastSyncDate() { return lastSyncDate; }
     public void setLastSyncDate(Date lastSyncDate) { this.lastSyncDate = lastSyncDate; }
+
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
 
     private void markForSync() {
         if ("asana".equals(source)) {
