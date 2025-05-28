@@ -17,7 +17,7 @@ public class AsanaApi {
                 .addHeader("Authorization", "Bearer " + accessToken)
                 .addHeader("Accept", "application/json")
                 .build();
-
+//
         Log.d(TAG, "Wysyłanie requestu do Asana API: " + request.url());
         client.newCall(request).enqueue(callback);
     }
