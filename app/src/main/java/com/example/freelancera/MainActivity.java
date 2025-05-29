@@ -113,7 +113,6 @@ public class MainActivity extends AppCompatActivity {
         Toolbar toolbar = findViewById(R.id.toolbar);
         if (toolbar != null) {
             toolbar.setTitle("");  // Pusty tytuł, bo mamy własny TextView
-            setSupportActionBar(toolbar);
             
             // Ustawienie tytułu w TextView
             TextView toolbarTitle = toolbar.findViewById(R.id.toolbarTitle);
