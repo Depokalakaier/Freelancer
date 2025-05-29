@@ -20,20 +20,29 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.example.freelancera.R;
-import com.example.freelancera.model.Task;
+import com.example.freelancera.models.Task;
 import com.example.freelancera.model.WorkTime;
 import com.example.freelancera.model.Invoice;
 import com.example.freelancera.util.JsonLoader;
+import com.google.android.material.button.MaterialButton;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.android.material.textfield.TextInputEditText;
+import com.example.freelancera.util.ClockifyManager;
+import com.example.freelancera.models.clockify.ClockifyTimeEntry;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.Locale;
 
 public class TaskDetailFragment extends Fragment {
 
     private static final String ARG_TASK_ID = "task_id";
+    private String taskId;
     private Task task;
     private WorkTime workTime;
     private boolean isWorking = false;
@@ -42,13 +51,24 @@ public class TaskDetailFragment extends Fragment {
     private Runnable timerRunnable;
     private int sessionSeconds = 0;
 
-    private TextView titleText, descText, statusText, clientText, workTimeText;
-    private Button startStopBtn;
-    private Button generateInvoiceBtn;
-    private Button exportPdfBtn;
+    // Views
+    private TextView titleText;
+    private TextView descriptionText;
+    private TextView statusText;
+    private TextView clientText;
+    private TextView dueDateText;
+    private TextView timeText;
+    private TextView amountText;
+    private MaterialButton startStopButton;
+    private MaterialButton completeButton;
+    private TextInputEditText ratePerHourEdit;
+    private MaterialButton saveButton;
 
     // Przechowuje ostatnio wygenerowaną fakturę
     private Invoice lastInvoice = null;
+
+    private FirebaseFirestore firestore;
+    private FirebaseUser user;
 
     public static TaskDetailFragment newInstance(String taskId) {
         TaskDetailFragment fragment = new TaskDetailFragment();
@@ -58,85 +78,264 @@ public class TaskDetailFragment extends Fragment {
         return fragment;
     }
 
-    public TaskDetailFragment() {}
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        if (getArguments() != null) {
+            taskId = getArguments().getString(ARG_TASK_ID);
+        }
+        firestore = FirebaseFirestore.getInstance();
+        user = FirebaseAuth.getInstance().getCurrentUser();
+        handler = new Handler(Looper.getMainLooper());
+    }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_task_detail, container, false);
 
+        // Initialize views
         titleText = view.findViewById(R.id.text_task_title);
-        descText = view.findViewById(R.id.text_task_desc);
+        descriptionText = view.findViewById(R.id.text_task_description);
         statusText = view.findViewById(R.id.text_task_status);
         clientText = view.findViewById(R.id.text_task_client);
-        workTimeText = view.findViewById(R.id.text_work_time);
-        startStopBtn = view.findViewById(R.id.btn_start_stop_work);
-        generateInvoiceBtn = view.findViewById(R.id.btn_generate_invoice);
-        exportPdfBtn = view.findViewById(R.id.btn_export_pdf);
-
-        String taskId = getArguments() != null ? getArguments().getString(ARG_TASK_ID) : null;
-        if (taskId != null) {
-            task = JsonLoader.findTaskById(getContext(), taskId);
-            workTime = JsonLoader.findWorkTimeByTaskId(getContext(), taskId);
-        }
-
-        if (task != null) {
-            titleText.setText(task.getTitle());
-            descText.setText(task.getDescription());
-            statusText.setText(task.getStatus());
-            clientText.setText(task.getClient());
-        }
-
-        updateWorkTimeText();
-
-        startStopBtn.setOnClickListener(v -> {
-            if (!isWorking) {
-                // START pracy
-                isWorking = true;
-                workStartMillis = System.currentTimeMillis();
-                startStopBtn.setText("Zakończ pracę");
-                startTimer();
-            } else {
-                // STOP pracy
-                isWorking = false;
-                sessionSeconds += (System.currentTimeMillis() - workStartMillis) / 1000;
-                addSessionToWorkTime();
-                saveWorkTime();
-                startStopBtn.setText("Rozpocznij pracę");
-                stopTimer();
-            }
-        });
-
-        generateInvoiceBtn.setOnClickListener(v -> generateAndSaveInvoice());
-
-        // OBSŁUGA PRZYCISKU EKSPORTU PDF
-        exportPdfBtn.setOnClickListener(v -> {
-            if (lastInvoice != null) {
-                exportInvoiceToPdf(lastInvoice);
-            } else {
-                Toast.makeText(getContext(), "Najpierw wygeneruj fakturę!", Toast.LENGTH_SHORT).show();
-            }
-        });
+        dueDateText = view.findViewById(R.id.text_task_due_date);
+        timeText = view.findViewById(R.id.text_task_time);
+        amountText = view.findViewById(R.id.text_task_amount);
+        startStopButton = view.findViewById(R.id.button_start_stop);
+        completeButton = view.findViewById(R.id.button_complete);
+        ratePerHourEdit = view.findViewById(R.id.edit_rate_per_hour);
+        saveButton = view.findViewById(R.id.button_save);
 
         return view;
     }
 
+    @Override
+    public void onViewCreated(View view, Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+
+        // Konfiguracja toolbara i przycisku powrotu
+        androidx.appcompat.widget.Toolbar toolbar = view.findViewById(R.id.toolbar);
+        if (toolbar != null) {
+            toolbar.setNavigationOnClickListener(v -> {
+                if (getActivity() != null) {
+                    getActivity().onBackPressed();
+                }
+            });
+        }
+
+        // Najpierw załaduj zadanie
+        loadTask();
+
+        // Przypisz listenery do przycisków
+        if (startStopButton != null) {
+            startStopButton.setOnClickListener(v -> toggleTimer());
+        }
+        if (completeButton != null) {
+            completeButton.setOnClickListener(v -> completeTask());
+        }
+        if (saveButton != null) {
+            saveButton.setOnClickListener(v -> saveChanges());
+        }
+    }
+
+    private void loadTask() {
+        if (user == null || taskId == null) {
+            Toast.makeText(getContext(), "Błąd: Brak dostępu do danych", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        firestore.collection("users")
+                .document(user.getUid())
+                .collection("tasks")
+                .document(taskId)
+                .get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (documentSnapshot.exists()) {
+                        task = documentSnapshot.toObject(Task.class);
+                        if (task != null) {
+                            // Upewnij się że ID jest ustawione
+                            task.setId(documentSnapshot.getId());
+                            
+                            // Upewnij się, że status jest prawidłowy
+                            if (task.getStatus() == null) {
+                                task.setStatus("Nowe");
+                            }
+                            
+                            updateUI();
+                            if (task.isTimerRunning()) {
+                                startTimer();
+                            }
+                        } else {
+                            Toast.makeText(getContext(), "Błąd: Nie można załadować zadania", Toast.LENGTH_LONG).show();
+                        }
+                    } else {
+                        Toast.makeText(getContext(), "Błąd: Zadanie nie istnieje", Toast.LENGTH_LONG).show();
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(getContext(), 
+                        "Błąd podczas ładowania zadania: " + e.getMessage(), 
+                        Toast.LENGTH_LONG).show();
+                });
+    }
+
+    private void updateUI() {
+        if (task == null || getContext() == null) return;
+
+        if (titleText != null) titleText.setText(task.getName());
+        if (descriptionText != null) descriptionText.setText(task.getDescription());
+        if (statusText != null) statusText.setText(task.getStatus());
+        if (clientText != null) clientText.setText(task.getClient());
+        if (ratePerHourEdit != null) {
+            // Formatuj stawkę z dwoma miejscami po przecinku i używaj przecinka jako separatora
+            String formattedRate = String.format(Locale.getDefault(), "%.2f", task.getRatePerHour())
+                    .replace(".", ",");
+            ratePerHourEdit.setText(formattedRate);
+        }
+        
+        if (dueDateText != null) {
+            if (task.getDueDate() != null) {
+                SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy", Locale.getDefault());
+                dueDateText.setText(sdf.format(task.getDueDate()));
+                dueDateText.setVisibility(View.VISIBLE);
+            } else {
+                dueDateText.setVisibility(View.GONE);
+            }
+        }
+
+        updateTimeAndAmount();
+        updateButtons();
+    }
+
+    private void updateTimeAndAmount() {
+        if (task == null || timeText == null || amountText == null) return;
+
+        long totalSeconds = task.getTotalTimeInSeconds();
+        if (task.isTimerRunning()) {
+            totalSeconds += (System.currentTimeMillis() - task.getLastStartTime()) / 1000;
+        }
+
+        // Format time
+        long hours = totalSeconds / 3600;
+        long minutes = (totalSeconds % 3600) / 60;
+        timeText.setText(String.format(Locale.getDefault(), "%02d:%02d", hours, minutes));
+
+        // Format amount
+        double amount = (totalSeconds / 3600.0) * task.getRatePerHour();
+        amountText.setText(String.format(Locale.getDefault(), "%.2f PLN", amount));
+    }
+
+    private void updateButtons() {
+        if (task == null || startStopButton == null || completeButton == null) return;
+
+        boolean isCompleted = "Ukończone".equals(task.getStatus());
+        
+        startStopButton.setEnabled(!isCompleted);
+        startStopButton.setText(task.isTimerRunning() ? "Stop" : "Start");
+        
+        completeButton.setEnabled(!isCompleted);
+        completeButton.setText(isCompleted ? "Ukończone" : "Oznacz jako ukończone");
+    }
+
+    private void toggleTimer() {
+        if (task == null) return;
+
+        ClockifyManager clockifyManager = ClockifyManager.getInstance(requireContext());
+        if (!clockifyManager.isConfigured()) {
+            Toast.makeText(getContext(), 
+                "Skonfiguruj Clockify w ustawieniach aplikacji", 
+                Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        task.setTimerRunning(!task.isTimerRunning());
+        if (task.isTimerRunning()) {
+            // Start timer in Clockify
+            ClockifyTimeEntry timeEntry = new ClockifyTimeEntry();
+            timeEntry.setDescription(task.getName());
+            ClockifyTimeEntry.TimeInterval interval = new ClockifyTimeEntry.TimeInterval();
+            interval.setStart(new Date());
+            timeEntry.setTimeInterval(interval);
+
+            clockifyManager.getApi()
+                .createTimeEntry(clockifyManager.getWorkspaceId(), timeEntry)
+                .enqueue(new retrofit2.Callback<ClockifyTimeEntry>() {
+                    @Override
+                    public void onResponse(retrofit2.Call<ClockifyTimeEntry> call, 
+                                        retrofit2.Response<ClockifyTimeEntry> response) {
+                        if (response.isSuccessful() && response.body() != null) {
+                            task.setClockifyTimeEntryId(response.body().getId());
+                            task.setLastStartTime(System.currentTimeMillis());
+                            startTimer();
+                            updateTask();
+                        } else {
+                            task.setTimerRunning(false);
+                            Toast.makeText(getContext(), 
+                                "Błąd podczas uruchamiania timera w Clockify", 
+                                Toast.LENGTH_LONG).show();
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(retrofit2.Call<ClockifyTimeEntry> call, Throwable t) {
+                        task.setTimerRunning(false);
+                        Toast.makeText(getContext(), 
+                            "Błąd połączenia z Clockify: " + t.getMessage(), 
+                            Toast.LENGTH_LONG).show();
+                    }
+                });
+        } else {
+            // Stop timer in Clockify
+            if (task.getClockifyTimeEntryId() != null) {
+                ClockifyTimeEntry timeEntry = new ClockifyTimeEntry();
+                ClockifyTimeEntry.TimeInterval interval = new ClockifyTimeEntry.TimeInterval();
+                interval.setEnd(new Date());
+                timeEntry.setTimeInterval(interval);
+
+                clockifyManager.getApi()
+                    .updateTimeEntry(
+                        clockifyManager.getWorkspaceId(), 
+                        task.getClockifyTimeEntryId(), 
+                        timeEntry)
+                    .enqueue(new retrofit2.Callback<ClockifyTimeEntry>() {
+                        @Override
+                        public void onResponse(retrofit2.Call<ClockifyTimeEntry> call, 
+                                            retrofit2.Response<ClockifyTimeEntry> response) {
+                            if (response.isSuccessful()) {
+                                stopTimer();
+                                long elapsedTime = System.currentTimeMillis() - task.getLastStartTime();
+                                task.setTotalTimeInSeconds(task.getTotalTimeInSeconds() + (elapsedTime / 1000));
+                                task.setClockifyTimeEntryId(null);
+                                updateTask();
+                            } else {
+                                task.setTimerRunning(true);
+                                Toast.makeText(getContext(), 
+                                    "Błąd podczas zatrzymywania timera w Clockify", 
+                                    Toast.LENGTH_LONG).show();
+                            }
+                        }
+
+                        @Override
+                        public void onFailure(retrofit2.Call<ClockifyTimeEntry> call, Throwable t) {
+                            task.setTimerRunning(true);
+                            Toast.makeText(getContext(), 
+                                "Błąd połączenia z Clockify: " + t.getMessage(), 
+                                Toast.LENGTH_LONG).show();
+                        }
+                    });
+            }
+        }
+    }
+
     private void startTimer() {
+        if (timerRunnable != null) {
+            handler.removeCallbacks(timerRunnable);
+        }
+
         timerRunnable = new Runnable() {
             @Override
             public void run() {
-                int elapsed = sessionSeconds;
-                if (isWorking) {
-                    elapsed += (System.currentTimeMillis() - workStartMillis) / 1000;
-                }
-                int totalMinutes = elapsed / 60;
-                int hours = totalMinutes / 60 + (workTime != null ? workTime.getHours() : 0);
-                int minutes = totalMinutes % 60 + (workTime != null ? workTime.getMinutes() : 0);
-                if (minutes >= 60) {
-                    hours += minutes / 60;
-                    minutes = minutes % 60;
-                }
-                workTimeText.setText(String.format(Locale.getDefault(),
-                        "Czas pracy: %d godz. %d min.", hours, minutes));
+                updateTimeAndAmount();
                 handler.postDelayed(this, 1000);
             }
         };
@@ -144,36 +343,43 @@ public class TaskDetailFragment extends Fragment {
     }
 
     private void stopTimer() {
-        handler.removeCallbacks(timerRunnable);
-        updateWorkTimeText();
-    }
-
-    private void updateWorkTimeText() {
-        int hours = workTime != null ? workTime.getHours() : 0;
-        int minutes = workTime != null ? workTime.getMinutes() : 0;
-        workTimeText.setText(String.format(Locale.getDefault(),
-                "Czas pracy: %d godz. %d min.", hours, minutes));
-    }
-
-    private void addSessionToWorkTime() {
-        int totalMinutes = sessionSeconds / 60;
-        int sessionHours = totalMinutes / 60;
-        int sessionMinutes = totalMinutes % 60;
-
-        if (workTime == null) {
-            workTime = new WorkTime(task.getId(), sessionHours, sessionMinutes);
-        } else {
-            int newMinutes = workTime.getMinutes() + sessionMinutes;
-            int newHours = workTime.getHours() + sessionHours + newMinutes / 60;
-            newMinutes = newMinutes % 60;
-            workTime.setHours(newHours);
-            workTime.setMinutes(newMinutes);
+        if (timerRunnable != null) {
+            handler.removeCallbacks(timerRunnable);
+            timerRunnable = null;
         }
-        sessionSeconds = 0;
     }
 
-    private void saveWorkTime() {
-        JsonLoader.saveWorkTime(getContext(), workTime);
+    private void completeTask() {
+        if (task == null) return;
+
+        if (task.isTimerRunning()) {
+            stopTimer();
+            long elapsedTime = System.currentTimeMillis() - task.getLastStartTime();
+            task.setTotalTimeInSeconds(task.getTotalTimeInSeconds() + (elapsedTime / 1000));
+            task.setTimerRunning(false);
+        }
+
+        task.setStatus("Ukończone");
+        updateTask();
+    }
+
+    private void updateTask() {
+        if (user == null || task == null) return;
+
+        firestore.collection("users")
+                .document(user.getUid())
+                .collection("tasks")
+                .document(task.getId())
+                .set(task)
+                .addOnSuccessListener(aVoid -> {
+                    updateUI();
+                    Toast.makeText(getContext(), "Zadanie zaktualizowane", Toast.LENGTH_SHORT).show();
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(getContext(), 
+                        "Błąd podczas aktualizacji zadania: " + e.getMessage(), 
+                        Toast.LENGTH_LONG).show();
+                });
     }
 
     private void generateAndSaveInvoice() {
@@ -195,7 +401,7 @@ public class TaskDetailFragment extends Fragment {
 
         Invoice invoice = new Invoice(
                 task.getId(),
-                task.getTitle(),
+                task.getName(),
                 task.getClient(),
                 totalAmount,
                 hourlyRate,
@@ -287,5 +493,52 @@ public class TaskDetailFragment extends Fragment {
         } catch (Exception e) {
             Toast.makeText(getContext(), "Nie można otworzyć PDF (brak aplikacji)?", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void saveChanges() {
+        if (task == null || user == null) return;
+
+        // Pobierz i zapisz stawkę godzinową
+        String rateText = ratePerHourEdit.getText().toString()
+                .replace(",", ".") // Zamień przecinek na kropkę
+                .trim(); // Usuń białe znaki
+                
+        if (!rateText.isEmpty()) {
+            try {
+                double rate = Double.parseDouble(rateText);
+                if (rate < 0) {
+                    Toast.makeText(getContext(), "Stawka nie może być ujemna", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                
+                // Aktualizuj model
+                task.setRatePerHour(rate);
+                
+                // Aktualizuj całe zadanie w Firestore
+                firestore.collection("users")
+                        .document(user.getUid())
+                        .collection("tasks")
+                        .document(task.getId())
+                        .set(task)  // Zapisz całe zadanie zamiast tylko jednego pola
+                        .addOnSuccessListener(aVoid -> {
+                            Toast.makeText(getContext(), "Zapisano zmiany", Toast.LENGTH_SHORT).show();
+                            updateTimeAndAmount(); // Przelicz kwotę z nową stawką
+                        })
+                        .addOnFailureListener(e -> {
+                            Toast.makeText(getContext(), "Błąd zapisu: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                            // Przywróć poprzednią wartość
+                            task.setRatePerHour(0.0);
+                            updateTimeAndAmount();
+                        });
+            } catch (NumberFormatException e) {
+                Toast.makeText(getContext(), "Nieprawidłowy format stawki. Użyj formatu: 50.00 lub 50,00", Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        stopTimer();
     }
 }

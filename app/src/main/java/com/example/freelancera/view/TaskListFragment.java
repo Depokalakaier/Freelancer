@@ -14,20 +14,26 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
 import android.widget.Spinner;
 import android.widget.Toast;
+import com.example.freelancera.MainActivity;
 import com.example.freelancera.R;
 import com.example.freelancera.adapter.TaskAdapter;
 import com.example.freelancera.models.Invoice;
 import com.example.freelancera.models.SyncHistory;
 import com.example.freelancera.models.Task;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.chip.ChipGroup;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import com.google.firebase.firestore.CollectionReference;
@@ -49,13 +55,25 @@ import android.util.Log;
 public class TaskListFragment extends Fragment {
     private static final String TAG = "TaskListFragment";
 
+    // Views
     private RecyclerView recyclerView;
+    private SwipeRefreshLayout swipeRefreshLayout;
+    private ChipGroup statusFilterGroup;
+    private AutoCompleteTextView sortByDropdown;
+    private MaterialButton sortDirectionButton;
+
+    // Adapter
     private TaskAdapter adapter;
-    private Spinner filterSpinner;
+
+    // Data
     private List<Task> allTasks = new ArrayList<>();
+    private String currentStatus = "all";
+    private String currentSortField = "name";
+    private boolean isAscending = true;
+
+    // Firebase
     private FirebaseFirestore firestore;
     private FirebaseUser user;
-    private SwipeRefreshLayout swipeRefreshLayout;
 
     public TaskListFragment() {}
 
@@ -68,13 +86,22 @@ public class TaskListFragment extends Fragment {
         user = FirebaseAuth.getInstance().getCurrentUser();
 
         // Initialize views
-        recyclerView = view.findViewById(R.id.recyclerViewTasks);
+        recyclerView = view.findViewById(R.id.tasks_recycler_view);
+        swipeRefreshLayout = view.findViewById(R.id.swipe_refresh_layout);
+        statusFilterGroup = view.findViewById(R.id.status_filter_group);
+        sortByDropdown = view.findViewById(R.id.sort_by_dropdown);
+        sortDirectionButton = view.findViewById(R.id.btn_sort_direction);
+
+        // Setup RecyclerView
+        adapter = new TaskAdapter(new ArrayList<>(), task -> {
+            if (getActivity() instanceof MainActivity) {
+                ((MainActivity) getActivity()).navigateToTaskDetail(task.getId());
+            }
+        });
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
-        adapter = new TaskAdapter(new ArrayList<>());
         recyclerView.setAdapter(adapter);
 
-        // Initialize SwipeRefreshLayout
-        swipeRefreshLayout = view.findViewById(R.id.swipeRefreshLayout);
+        // Setup SwipeRefreshLayout
         swipeRefreshLayout.setOnRefreshListener(this::fetchAndSyncTasksFromAsana);
         swipeRefreshLayout.setColorSchemeResources(
             android.R.color.holo_blue_bright,
@@ -83,95 +110,124 @@ public class TaskListFragment extends Fragment {
             android.R.color.holo_red_light
         );
 
-        // Initialize status filter
-        filterSpinner = view.findViewById(R.id.task_filter_spinner);
-        ArrayAdapter<CharSequence> spinnerAdapter = ArrayAdapter.createFromResource(
-                getContext(),
-                R.array.task_status_filter,
-                android.R.layout.simple_spinner_item
-        );
-        spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        filterSpinner.setAdapter(spinnerAdapter);
+        // Setup filters and sorting
+        setupFilters();
+        setupSorting();
 
-        filterSpinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
-                showFilteredTasks();
-            }
-            @Override
-            public void onNothingSelected(android.widget.AdapterView<?> parent) {}
-        });
-
-        fetchAndSyncTasksFromAsana();
+        // Initial data load - only load local tasks
+        loadTasksFromFirestore(user.getUid());
 
         return view;
     }
 
     private void fetchAndSyncTasksFromAsana() {
         if (user == null) {
+            Log.e(TAG, "fetchAndSyncTasksFromAsana: user is null");
+            swipeRefreshLayout.setRefreshing(false);
+            Toast.makeText(getContext(), "Błąd: Użytkownik nie jest zalogowany", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        if (getContext() == null) {
+            Log.e(TAG, "fetchAndSyncTasksFromAsana: context is null");
             swipeRefreshLayout.setRefreshing(false);
             return;
         }
-        swipeRefreshLayout.setRefreshing(true);
+        
+        Log.d(TAG, "fetchAndSyncTasksFromAsana: starting task sync");
+        
         firestore.collection("users").document(user.getUid())
             .get()
             .addOnSuccessListener(documentSnapshot -> {
                 if (documentSnapshot.exists()) {
                     String asanaToken = documentSnapshot.getString("asanaToken");
                     if (asanaToken != null) {
+                        Log.d(TAG, "fetchAndSyncTasksFromAsana: found Asana token, fetching tasks");
                         fetchTasksFromAsanaAndSave(asanaToken, user.getUid());
                     } else {
+                        Log.e(TAG, "fetchAndSyncTasksFromAsana: no Asana token found");
                         swipeRefreshLayout.setRefreshing(false);
-                        Toast.makeText(getContext(), "Brak tokenu Asany", Toast.LENGTH_LONG).show();
+                        Toast.makeText(getContext(), "Brak tokenu Asany. Połącz konto w ustawieniach.", Toast.LENGTH_LONG).show();
+                        loadTasksFromFirestore(user.getUid());
                     }
+                } else {
+                    Log.e(TAG, "fetchAndSyncTasksFromAsana: user document doesn't exist");
+                    swipeRefreshLayout.setRefreshing(false);
+                    Toast.makeText(getContext(), "Błąd: Nie znaleziono dokumentu użytkownika", Toast.LENGTH_LONG).show();
+                    loadTasksFromFirestore(user.getUid());
                 }
             })
             .addOnFailureListener(e -> {
+                Log.e(TAG, "fetchAndSyncTasksFromAsana: error getting user document", e);
                 swipeRefreshLayout.setRefreshing(false);
-                Toast.makeText(getContext(), "Błąd przy pobieraniu tokenu", Toast.LENGTH_LONG).show();
+                Toast.makeText(getContext(), "Błąd przy pobieraniu tokenu: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                loadTasksFromFirestore(user.getUid());
             });
     }
 
     private void fetchTasksFromAsanaAndSave(String token, String uid) {
+        Log.d(TAG, "fetchTasksFromAsanaAndSave: fetching workspaces");
         OkHttpClient client = new OkHttpClient();
-        // Najpierw pobierz workspace (zakładamy pierwszy)
         Request wsRequest = new Request.Builder()
                 .url("https://app.asana.com/api/1.0/workspaces")
                 .addHeader("Authorization", "Bearer " + token)
                 .build();
+                
         client.newCall(wsRequest).enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
+                Log.e(TAG, "fetchTasksFromAsanaAndSave: workspace request failed", e);
                 swipeRefreshLayout.post(() -> {
                     swipeRefreshLayout.setRefreshing(false);
                     Toast.makeText(getContext(), "Błąd pobierania workspace: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    // Spróbuj załadować lokalne zadania
+                    loadTasksFromFirestore(uid);
                 });
             }
+            
             @Override
             public void onResponse(Call call, Response response) throws IOException {
                 if (response.isSuccessful()) {
                     try {
-                        JSONObject wsJson = new JSONObject(response.body().string());
+                        String responseBody = response.body().string();
+                        Log.d(TAG, "fetchTasksFromAsanaAndSave: workspace response: " + responseBody);
+                        JSONObject wsJson = new JSONObject(responseBody);
                         JSONArray workspaces = wsJson.getJSONArray("data");
                         if (workspaces.length() > 0) {
                             String workspaceId = workspaces.getJSONObject(0).getString("gid");
+                            Log.d(TAG, "fetchTasksFromAsanaAndSave: found workspace: " + workspaceId);
                             fetchTasksFromAsana(token, uid, workspaceId);
                         } else {
+                            Log.e(TAG, "fetchTasksFromAsanaAndSave: no workspaces found");
                             swipeRefreshLayout.post(() -> {
                                 swipeRefreshLayout.setRefreshing(false);
                                 Toast.makeText(getContext(), "Brak workspace w Asana", Toast.LENGTH_LONG).show();
+                                // Spróbuj załadować lokalne zadania
+                                loadTasksFromFirestore(uid);
                             });
                         }
                     } catch (JSONException e) {
+                        Log.e(TAG, "fetchTasksFromAsanaAndSave: error parsing workspace response", e);
                         swipeRefreshLayout.post(() -> {
                             swipeRefreshLayout.setRefreshing(false);
                             Toast.makeText(getContext(), "Błąd parsowania workspace: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                            // Spróbuj załadować lokalne zadania
+                            loadTasksFromFirestore(uid);
                         });
                     }
                 } else {
+                    Log.e(TAG, "fetchTasksFromAsanaAndSave: workspace request failed with code: " + response.code());
+                    String responseBody = response.body().string();
+                    Log.e(TAG, "fetchTasksFromAsanaAndSave: error response: " + responseBody);
                     swipeRefreshLayout.post(() -> {
                         swipeRefreshLayout.setRefreshing(false);
-                        Toast.makeText(getContext(), "Błąd pobierania workspace: " + response.message(), Toast.LENGTH_LONG).show();
+                        if (response.code() == 401) {
+                            Toast.makeText(getContext(), "Token Asany wygasł. Połącz konto ponownie.", Toast.LENGTH_LONG).show();
+                        } else {
+                            Toast.makeText(getContext(), "Błąd pobierania workspace: " + response.message(), Toast.LENGTH_LONG).show();
+                        }
+                        // Spróbuj załadować lokalne zadania
+                        loadTasksFromFirestore(uid);
                     });
                 }
             }
@@ -379,70 +435,45 @@ public class TaskListFragment extends Fragment {
     }
 
     private void loadTasksFromFirestore(String uid) {
-        FirebaseFirestore db = FirebaseFirestore.getInstance();
-        db.collection("users").document(uid).collection("tasks")
-            .get()
-            .addOnSuccessListener(querySnapshot -> {
-                allTasks.clear();
-                for (DocumentSnapshot doc : querySnapshot.getDocuments()) {
-                    String id = doc.getString("id");
-                    String name = doc.getString("name");
-                    String status = doc.getString("status");
-                    String dueDateStr = doc.getString("dueDate");
-                    String createdAtStr = doc.getString("createdAt");
-                    Task task = new Task();
-                    task.setId(id);
-                    task.setName(name);
-                    task.setStatus(status);
-                    // Parsowanie dueDate
-                    if (dueDateStr != null) {
-                        try {
-                            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault());
-                            task.setDueDate(sdf.parse(dueDateStr));
-                        } catch (java.text.ParseException e) {
-                            task.setDueDate((java.util.Date) null);
-                        }
+        Log.d(TAG, "loadTasksFromFirestore: loading tasks for user " + uid);
+        
+        if (getContext() == null) {
+            Log.e(TAG, "loadTasksFromFirestore: context is null");
+            swipeRefreshLayout.setRefreshing(false);
+            return;
+        }
+
+        firestore.collection("users").document(uid)
+                .collection("tasks")
+                .get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    allTasks.clear();
+                    for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
+                        Task task = document.toObject(Task.class);
+                        task.setId(document.getId());
+                        allTasks.add(task);
                     }
-                    // Parsowanie createdAt
-                    if (createdAtStr != null) {
-                        try {
-                            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.getDefault());
-                            task.setCreatedAt(sdf.parse(createdAtStr));
-                        } catch (java.text.ParseException e) {
-                            // Ignoruj błąd
-                        }
-                    }
-                    allTasks.add(task);
-                }
-                swipeRefreshLayout.setRefreshing(false);
-                showFilteredTasks();
-            })
-            .addOnFailureListener(e -> {
-                swipeRefreshLayout.setRefreshing(false);
-                Toast.makeText(getContext(), "Błąd pobierania zadań z Firestore", Toast.LENGTH_LONG).show();
-            });
+                    filterAndSortTasks();
+                    swipeRefreshLayout.setRefreshing(false);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "loadTasksFromFirestore: error loading tasks", e);
+                    Toast.makeText(getContext(), "Błąd podczas ładowania zadań: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    swipeRefreshLayout.setRefreshing(false);
+                });
     }
 
     private void showFilteredTasks() {
-        String filter = filterSpinner.getSelectedItem().toString();
         List<Task> filteredTasks = new ArrayList<>();
 
         for (Task task : allTasks) {
-            if (filter.equals("Wszystkie") || task.getStatus().equals(filter)) {
+            if ("all".equals(currentStatus) || task.getStatus().equals(currentStatus)) {
                 filteredTasks.add(task);
             }
         }
 
-        // Sort tasks: New and In Progress first, then Completed
-        Collections.sort(filteredTasks, (t1, t2) -> {
-            // First New, then In Progress, finally Completed
-            List<String> order = List.of("Nowe", "W toku", "Ukończone");
-            int i1 = order.indexOf(t1.getStatus());
-            int i2 = order.indexOf(t2.getStatus());
-            return Integer.compare(i1, i2);
-        });
-
-        adapter.updateTasks(filteredTasks);
+        // Sort tasks based on current sort settings
+        filterAndSortTasks();
     }
 
     private void handleCompletedTask(Task task) {
@@ -528,5 +559,103 @@ public class TaskListFragment extends Fragment {
                     Toast.makeText(getContext(), 
                         "Błąd zapisu historii: " + e.getMessage(), 
                         Toast.LENGTH_SHORT).show());
+    }
+
+    private void setupFilters() {
+        statusFilterGroup.setOnCheckedChangeListener((group, checkedId) -> {
+            if (checkedId == R.id.chip_all) {
+                currentStatus = "all";
+            } else if (checkedId == R.id.chip_new) {
+                currentStatus = "Nowe";
+            } else if (checkedId == R.id.chip_in_progress) {
+                currentStatus = "W toku";
+            } else if (checkedId == R.id.chip_completed) {
+                currentStatus = "Ukończone";
+            }
+            filterAndSortTasks();
+        });
+    }
+
+    private void setupSorting() {
+        String[] sortOptions = new String[]{"Nazwa", "Data utworzenia", "Termin", "Status", "Klient"};
+        ArrayAdapter<String> dropdownAdapter = new ArrayAdapter<>(
+                requireContext(),
+                android.R.layout.simple_dropdown_item_1line,
+                sortOptions
+        );
+        sortByDropdown.setAdapter(dropdownAdapter);
+        
+        sortByDropdown.setOnItemClickListener((parent, view, position, id) -> {
+            switch (position) {
+                case 0:
+                    currentSortField = "name";
+                    break;
+                case 1:
+                    currentSortField = "createdAt";
+                    break;
+                case 2:
+                    currentSortField = "dueDate";
+                    break;
+                case 3:
+                    currentSortField = "status";
+                    break;
+                case 4:
+                    currentSortField = "client";
+                    break;
+            }
+            filterAndSortTasks();
+        });
+
+        sortDirectionButton.setOnClickListener(v -> {
+            isAscending = !isAscending;
+            sortDirectionButton.setText(isAscending ? "↓" : "↑");
+            filterAndSortTasks();
+        });
+    }
+
+    private void filterAndSortTasks() {
+        List<Task> filteredTasks = new ArrayList<>(allTasks);
+
+        // Filtrowanie po statusie
+        if (!"all".equals(currentStatus)) {
+            filteredTasks.removeIf(task -> !currentStatus.equals(task.getStatus()));
+        }
+
+        // Sortowanie
+        filteredTasks.sort((task1, task2) -> {
+            int result = 0;
+            switch (currentSortField) {
+                case "name":
+                    result = compareStrings(task1.getName(), task2.getName());
+                    break;
+                case "createdAt":
+                    result = compareDates(task1.getCreatedAt(), task2.getCreatedAt());
+                    break;
+                case "dueDate":
+                    result = compareDates(task1.getDueDate(), task2.getDueDate());
+                    break;
+                case "status":
+                    result = compareStrings(task1.getStatus(), task2.getStatus());
+                    break;
+                case "client":
+                    result = compareStrings(task1.getClient(), task2.getClient());
+                    break;
+            }
+            return isAscending ? result : -result;
+        });
+
+        adapter.updateTasks(filteredTasks);
+    }
+
+    private int compareStrings(String s1, String s2) {
+        if (s1 == null) return s2 == null ? 0 : 1;
+        if (s2 == null) return -1;
+        return s1.compareTo(s2);
+    }
+
+    private int compareDates(Date d1, Date d2) {
+        if (d1 == null) return d2 == null ? 0 : 1;
+        if (d2 == null) return -1;
+        return d1.compareTo(d2);
     }
 }

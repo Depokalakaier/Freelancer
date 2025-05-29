@@ -17,12 +17,17 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.appcompat.widget.Toolbar;
 import android.widget.TextView;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentTransaction;
 
 import com.bumptech.glide.Glide;
 import com.example.freelancera.auth.AsanaAuthManager;
 import com.example.freelancera.auth.AsanaLoginFragment;
 import com.example.freelancera.models.Task;
+import com.example.freelancera.view.TaskDetailFragment;
 import com.example.freelancera.view.TaskListFragment;
+import com.example.freelancera.view.InvoiceListFragment;
+import com.example.freelancera.view.SettingsFragment;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
@@ -62,6 +67,33 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        BottomNavigationView navView = findViewById(R.id.nav_view);
+        navView.setOnNavigationItemSelectedListener(item -> {
+            int itemId = item.getItemId();
+            if (itemId == R.id.navigation_tasks) {
+                getSupportFragmentManager().beginTransaction()
+                        .replace(R.id.nav_host_fragment, new TaskListFragment())
+                        .commit();
+                return true;
+            } else if (itemId == R.id.navigation_invoices) {
+                getSupportFragmentManager().beginTransaction()
+                        .replace(R.id.nav_host_fragment, new InvoiceListFragment())
+                        .commit();
+                return true;
+            } else if (itemId == R.id.navigation_settings) {
+                getSupportFragmentManager().beginTransaction()
+                        .replace(R.id.nav_host_fragment, new SettingsFragment())
+                        .commit();
+                return true;
+            }
+            return false;
+        });
+
+        // Domyślnie pokaż listę zadań
+        if (savedInstanceState == null) {
+            navView.setSelectedItemId(R.id.navigation_tasks);
+        }
 
         // Inicjalizacja Firebase
         initializeFirebase();
@@ -138,7 +170,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupBottomNavigation() {
-        bottomNavigationView = findViewById(R.id.bottom_navigation);
+        bottomNavigationView = findViewById(R.id.nav_view);
         if (bottomNavigationView != null) {
             bottomNavigationView.setOnItemSelectedListener(item -> {
                 int itemId = item.getItemId();
@@ -147,10 +179,14 @@ public class MainActivity extends AppCompatActivity {
                     checkAsanaConnection();
                     return true;
                 } else if (itemId == R.id.navigation_invoices) {
-                    // TODO: Implementacja widoku faktur
+                    getSupportFragmentManager().beginTransaction()
+                        .replace(R.id.nav_host_fragment, new InvoiceListFragment())
+                        .commit();
                     return true;
-                } else if (itemId == R.id.navigation_history) {
-                    // TODO: Implementacja widoku historii
+                } else if (itemId == R.id.navigation_settings) {
+                    getSupportFragmentManager().beginTransaction()
+                        .replace(R.id.nav_host_fragment, new SettingsFragment())
+                        .commit();
                     return true;
                 }
                 return false;
@@ -404,7 +440,7 @@ public class MainActivity extends AppCompatActivity {
                                                                                 // Odśwież fragment z listą zadań
                                                                                 getSupportFragmentManager()
                                                                                     .beginTransaction()
-                                                                                    .replace(R.id.fragment_container, new com.example.freelancera.view.TaskListFragment())
+                                                                                    .replace(R.id.nav_host_fragment, new TaskListFragment())
                                                                                     .commit();
                                                                             });
                                                                         } catch (Exception e) {
@@ -674,5 +710,15 @@ public class MainActivity extends AppCompatActivity {
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+    public void navigateToTaskDetail(String taskId) {
+        TaskDetailFragment fragment = TaskDetailFragment.newInstance(taskId);
+        getSupportFragmentManager()
+            .beginTransaction()
+            .replace(R.id.nav_host_fragment, fragment)
+            .addToBackStack(null)
+            .setTransition(FragmentTransaction.TRANSIT_FRAGMENT_OPEN)
+            .commit();
     }
 }

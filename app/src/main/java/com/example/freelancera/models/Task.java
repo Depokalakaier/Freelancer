@@ -14,7 +14,6 @@ import java.util.Locale;
 public class Task implements Parcelable {
     private static final String TAG = "Task";
     
-    @DocumentId
     private String id;
     private String name;
     private String description;
@@ -30,12 +29,26 @@ public class Task implements Parcelable {
     private boolean needsSync; // true jeśli zadanie wymaga synchronizacji z Asana
     private Date lastSyncDate; // data ostatniej synchronizacji
     private Date createdAt;
+    // Nowe pola dla Clockify
+    private String clockifyTimeEntryId;
+    private long totalTimeInSeconds;
+    private Date startTime;
+    private Date endTime;
+    private double totalAmount; // Kwota do zapłaty (czas * stawka)
+    private String currency = "PLN"; // Domyślna waluta
+    private String invoiceNumber; // Numer faktury jeśli została wygenerowana
+    private boolean isTimerRunning;
+    private long lastStartTime;
 
     public Task() {
         // Required empty constructor for Firestore
         this.source = "local";
         this.needsSync = false;
         this.lastSyncDate = new Date();
+        this.totalTimeInSeconds = 0;
+        this.totalAmount = 0.0;
+        this.status = "Nowe";
+        this.id = String.valueOf(System.currentTimeMillis()); // Generujemy tymczasowe ID
     }
 
     public Task(String asanaId, String name, String status) {
@@ -143,8 +156,18 @@ public class Task implements Parcelable {
     }
 
     // Getters and setters
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
+    public String getId() { 
+        if (id == null) {
+            id = String.valueOf(System.currentTimeMillis());
+        }
+        return id; 
+    }
+    
+    public void setId(String id) { 
+        if (id != null && !id.isEmpty()) {
+            this.id = id;
+        }
+    }
 
     public String getName() { return name; }
     public void setName(String name) { 
@@ -158,9 +181,34 @@ public class Task implements Parcelable {
         markForSync();
     }
 
-    public String getStatus() { return status != null ? status : "Nowe"; }
+    public String getStatus() { 
+        // Zawsze zwracaj prawidłowy status
+        if (status == null || status.isEmpty()) {
+            return "Nowe";
+        }
+        // Normalizuj status do jednej z trzech dozwolonych wartości
+        switch (status) {
+            case "Nowe":
+            case "W toku":
+            case "Ukończone":
+                return status;
+            default:
+                return "Nowe";
+        }
+    }
+
     public void setStatus(String status) { 
-        this.status = status;
+        // Akceptuj tylko prawidłowe statusy
+        switch (status) {
+            case "Nowe":
+            case "W toku":
+            case "Ukończone":
+                this.status = status;
+                break;
+            default:
+                this.status = "Nowe";
+                break;
+        }
         if ("Ukończone".equals(status)) {
             this.completedDate = new Date();
         }
@@ -173,10 +221,17 @@ public class Task implements Parcelable {
         markForSync();
     }
 
-    public double getRatePerHour() { return ratePerHour; }
+    public double getRatePerHour() { 
+        // Jeśli stawka jest ujemna lub nie została ustawiona, zwróć 0
+        return ratePerHour < 0 ? 0.0 : ratePerHour; 
+    }
+    
     public void setRatePerHour(double ratePerHour) { 
-        this.ratePerHour = ratePerHour;
+        // Nie pozwól na ujemną stawkę
+        this.ratePerHour = Math.max(0.0, ratePerHour);
         markForSync();
+        // Przelicz całkowitą kwotę
+        calculateTotalAmount();
     }
 
     public Date getDueDate() { return dueDate; }
@@ -221,6 +276,42 @@ public class Task implements Parcelable {
     public Date getCreatedAt() { return createdAt; }
     public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
 
+    public String getClockifyTimeEntryId() { return clockifyTimeEntryId; }
+    public void setClockifyTimeEntryId(String clockifyTimeEntryId) { this.clockifyTimeEntryId = clockifyTimeEntryId; }
+
+    public long getTotalTimeInSeconds() { return totalTimeInSeconds; }
+    public void setTotalTimeInSeconds(long totalTimeInSeconds) { 
+        this.totalTimeInSeconds = totalTimeInSeconds;
+        calculateTotalAmount();
+    }
+
+    public Date getStartTime() { return startTime; }
+    public void setStartTime(Date startTime) { this.startTime = startTime; }
+
+    public Date getEndTime() { return endTime; }
+    public void setEndTime(Date endTime) { 
+        this.endTime = endTime;
+        if (startTime != null) {
+            this.totalTimeInSeconds = (endTime.getTime() - startTime.getTime()) / 1000;
+            calculateTotalAmount();
+        }
+    }
+
+    public double getTotalAmount() { return totalAmount; }
+    public void setTotalAmount(double totalAmount) { this.totalAmount = totalAmount; }
+
+    public String getCurrency() { return currency; }
+    public void setCurrency(String currency) { this.currency = currency; }
+
+    public String getInvoiceNumber() { return invoiceNumber; }
+    public void setInvoiceNumber(String invoiceNumber) { this.invoiceNumber = invoiceNumber; }
+
+    public boolean isTimerRunning() { return isTimerRunning; }
+    public void setTimerRunning(boolean timerRunning) { isTimerRunning = timerRunning; }
+
+    public long getLastStartTime() { return lastStartTime; }
+    public void setLastStartTime(long lastStartTime) { this.lastStartTime = lastStartTime; }
+
     private void markForSync() {
         if ("asana".equals(source)) {
             this.needsSync = true;
@@ -229,5 +320,20 @@ public class Task implements Parcelable {
 
     public Invoice generateInvoice() {
         return new Invoice(id, client, name, ratePerHour);
+    }
+
+    private void calculateTotalAmount() {
+        double hours = totalTimeInSeconds / 3600.0;
+        this.totalAmount = hours * ratePerHour;
+    }
+
+    public String getFormattedTotalTime() {
+        long hours = totalTimeInSeconds / 3600;
+        long minutes = (totalTimeInSeconds % 3600) / 60;
+        return String.format(Locale.getDefault(), "%02d:%02d", hours, minutes);
+    }
+
+    public String getFormattedAmount() {
+        return String.format(Locale.getDefault(), "%.2f %s", totalAmount, currency);
     }
 } 

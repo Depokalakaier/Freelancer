@@ -30,9 +30,20 @@
     <color name="teal_200">#FF03DAC5</color>
     <color name="teal_700">#FF018786</color>
 
-    <!-- Task status colors -->
-    <color name="status_new">#2196F3</color>
-    <color name="status_in_progress">#FF9800</color>
-    <color name="status_completed">#4CAF50</color>
-    <color name="status_default">#757575</color>
+    <!-- Task status colors - light theme -->
+    <color name="task_new">#42A5F5</color>
+    <color name="task_in_progress">#AED581</color>
+    <color name="task_completed">#CE93D8</color>
+    <color name="task_default">#E0E0E0</color>
+
+    <!-- Task status colors - dark theme -->
+    <color name="task_new_dark">#1565C0</color>
+    <color name="task_in_progress_dark">#558B2F</color>
+    <color name="task_completed_dark">#7B1FA2</color>
+    <color name="task_default_dark">#424242</color>
+
+    <!-- Text colors -->
+    <color name="text_primary">#DE000000</color>
+    <color name="text_secondary">#99000000</color>
+    <color name="text_hint">#61000000</color>
 </resources>
