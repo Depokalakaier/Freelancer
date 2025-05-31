@@ -1,21 +1,110 @@
 <!DOCTYPE html>
-<html>
+<html lang="pl">
 <head>
-    <meta charset="UTF-8" />
-    <title>Connect to Toggl</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Połącz z Toggl</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f7f9fa;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .container {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.07);
+      padding: 32px 24px 24px 24px;
+      max-width: 350px;
+      width: 100%;
+      text-align: center;
+    }
+    h1 {
+      color: #e2442f;
+      margin-bottom: 8px;
+    }
+    p {
+      color: #333;
+      margin-bottom: 20px;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 16px;
+      margin-bottom: 16px;
+      box-sizing: border-box;
+    }
+    button {
+      background: #e2442f;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 12px 0;
+      width: 100%;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .success {
+      color: #388e3c;
+      margin-top: 16px;
+      font-weight: bold;
+    }
+    .error {
+      color: #e2442f;
+      margin-top: 16px;
+      font-weight: bold;
+    }
+    .info {
+      color: #888;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+  </style>
 </head>
 <body>
-<h1>Połącz z Toggl</h1>
-<p>Wklej swój <strong>API Token</strong> z <a href="https://track.toggl.com/profile" target="_blank">Toggl Profile</a></p>
-<input id="token" type="text" placeholder="API Token" />
-<button onclick="connect()">Połącz</button>
-
-<script>
+  <div class="container">
+    <h1>Połącz z Toggl</h1>
+    <p>Wklej swój <strong>API Token</strong> z <a href="https://track.toggl.com/profile" target="_blank">Toggl Profile</a></p>
+    <div class="info">Twój klucz nigdy nie jest przechowywany na tej stronie.</div>
+    <input id="token" type="text" placeholder="API Token" autocomplete="off" />
+    <button id="connectBtn" onclick="connect()">Połącz</button>
+    <div id="msg"></div>
+  </div>
+  <script>
     function connect() {
-      const token = document.getElementById('token').value;
-      const redirect = "myapp://callback?token=" + token;
-      window.location.href = redirect;
+      const token = document.getElementById('token').value.trim();
+      const msg = document.getElementById('msg');
+      if (!token || token.length < 20) {
+        msg.textContent = 'Podaj poprawny API Token.';
+        msg.className = 'error';
+        return;
+      }
+      msg.textContent = 'Przekierowywanie...';
+      msg.className = 'info';
+      setTimeout(() => {
+        const redirect = "myapp://callback?token=" + encodeURIComponent(token);
+        window.location.href = redirect;
+        msg.textContent = 'Jeśli aplikacja się nie otworzy, wróć i spróbuj ponownie.';
+        msg.className = 'success';
+      }, 500);
     }
-</script>
+    document.getElementById('token').addEventListener('keyup', function(e) {
+      if (e.key === 'Enter') connect(
+      ;
+    });
+  </script>
 </body>
 </html>

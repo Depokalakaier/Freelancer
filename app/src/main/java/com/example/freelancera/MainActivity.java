@@ -87,6 +87,24 @@ public class MainActivity extends AppCompatActivity {
 
             if (data.getScheme().equals("freelancera") && data.getHost().equals("oauth")) {
                 AsanaLoginFragment.handleOAuthResponse(data, this);
+            } else if (data.getScheme().equals("myapp") && data.getHost().equals("callback")) {
+                String token = data.getQueryParameter("token");
+                if (token != null && user != null) {
+                    // Zapisz do Firestore
+                    firestore.collection("users").document(user.getUid())
+                        .update("togglToken", token)
+                        .addOnSuccessListener(unused -> Log.d(TAG, "Toggl token zapisany w Firestore"))
+                        .addOnFailureListener(e -> Log.e(TAG, "Błąd zapisu Toggl token: " + e.getMessage()));
+                    // Zapisz do SharedPreferences
+                    getSharedPreferences("toggl_prefs", MODE_PRIVATE)
+                        .edit().putString("api_key", token).apply();
+                    Toast.makeText(this, "Połączono z Toggl!", Toast.LENGTH_LONG).show();
+                    // Odśwież profil, jeśli otwarty
+                    if (profileBottomSheet != null && profileBottomSheet.isShowing()) {
+                        profileBottomSheet.dismiss();
+                        showProfileBottomSheet();
+                    }
+                }
             }
         }
     }
@@ -182,6 +200,7 @@ public class MainActivity extends AppCompatActivity {
         SwitchMaterial darkModeSwitch = bottomSheetView.findViewById(R.id.darkModeSwitch);
         MaterialButton changePasswordButton = bottomSheetView.findViewById(R.id.changePasswordButton);
         MaterialButton logoutButton = bottomSheetView.findViewById(R.id.logoutButton);
+        MaterialButton connectTogglButton = bottomSheetView.findViewById(R.id.connectTogglButton);
 
         // Ustawienie emaila użytkownika
         if (user != null && user.getEmail() != null) {
@@ -203,6 +222,16 @@ public class MainActivity extends AppCompatActivity {
                     Toast.LENGTH_SHORT).show());
         }
 
+        // Sprawdź status połączenia z Toggl
+        boolean togglConnected = false;
+        String togglToken = null;
+        if (user != null) {
+            togglToken = getSharedPreferences("toggl_prefs", MODE_PRIVATE).getString("api_key", null);
+        }
+        if (togglToken != null && !togglToken.isEmpty()) {
+            togglConnected = true;
+        }
+
         // Obsługa zdjęcia profilowego
         profileImage.setOnClickListener(v -> {
             Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
@@ -218,6 +247,38 @@ public class MainActivity extends AppCompatActivity {
             }
             profileBottomSheet.dismiss();
         });
+
+        // Obsługa przycisku Toggl
+        if (connectTogglButton != null) {
+            if (togglConnected) {
+                connectTogglButton.setText("Rozłącz z Toggl");
+                connectTogglButton.setBackgroundColor(androidx.core.content.ContextCompat.getColor(this, android.R.color.holo_red_light));
+                connectTogglButton.setOnClickListener(v -> {
+                    // Usuń token z Firestore i SharedPreferences
+                    if (user != null) {
+                        firestore.collection("users").document(user.getUid())
+                            .update("togglToken", null)
+                            .addOnSuccessListener(unused -> Log.d(TAG, "Toggl token usunięty z Firestore"))
+                            .addOnFailureListener(e -> Log.e(TAG, "Błąd usuwania Toggl token: " + e.getMessage()));
+                    }
+                    getSharedPreferences("toggl_prefs", MODE_PRIVATE).edit().remove("api_key").apply();
+                    Toast.makeText(this, "Rozłączono z Toggl", Toast.LENGTH_SHORT).show();
+                    profileBottomSheet.dismiss();
+                    showProfileBottomSheet();
+                });
+            } else {
+                connectTogglButton.setText("Połącz z Toggl");
+                connectTogglButton.setBackgroundColor(androidx.core.content.ContextCompat.getColor(this, android.R.color.holo_blue_light));
+                connectTogglButton.setOnClickListener(v -> {
+                    // Otwórz stronę do pobrania tokenu w Custom Tabs
+                    String togglConnectUrl = "https://depokalakaier.github.io/Freelancer/connect-toggle.html";
+                    androidx.browser.customtabs.CustomTabsIntent customTabsIntent = new androidx.browser.customtabs.CustomTabsIntent.Builder()
+                        .setShowTitle(true)
+                        .build();
+                    customTabsIntent.launchUrl(this, android.net.Uri.parse(togglConnectUrl));
+                });
+            }
+        }
 
         // Obsługa przełącznika ciemnego motywu
         darkModeSwitch.setChecked(AppCompatDelegate.getDefaultNightMode() == AppCompatDelegate.MODE_NIGHT_YES);
