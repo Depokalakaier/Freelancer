@@ -11,7 +11,7 @@
         android:title="Faktury" />
 
     <item
-        android:id="@+id/navigation_settings"
+        android:id="@+id/navigation_history"
         android:icon="@android:drawable/ic_menu_preferences"
         android:title="Ustawienia" />
 </menu>

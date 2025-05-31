@@ -95,7 +95,12 @@ public class TaskListFragment extends Fragment {
         // Setup RecyclerView
         adapter = new TaskAdapter(new ArrayList<>(), task -> {
             if (getActivity() instanceof MainActivity) {
-                ((MainActivity) getActivity()).navigateToTaskDetail(task.getId());
+                // Otwórz szczegóły zadania w TaskDetailFragment
+                getActivity().getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, TaskDetailFragment.newInstance(task.getId()))
+                    .addToBackStack(null)
+                    .commit();
             }
         });
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));

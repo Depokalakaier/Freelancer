@@ -182,7 +182,6 @@ public class MainActivity extends AppCompatActivity {
         SwitchMaterial darkModeSwitch = bottomSheetView.findViewById(R.id.darkModeSwitch);
         MaterialButton changePasswordButton = bottomSheetView.findViewById(R.id.changePasswordButton);
         MaterialButton logoutButton = bottomSheetView.findViewById(R.id.logoutButton);
-        MaterialButton connectTogglButton = bottomSheetView.findViewById(R.id.connectTogglButton);
 
         // Ustawienie emaila użytkownika
         if (user != null && user.getEmail() != null) {
@@ -195,12 +194,12 @@ public class MainActivity extends AppCompatActivity {
             firestore.collection("users").document(user.getUid())
                 .get()
                 .addOnSuccessListener(document -> {
-                    boolean isConnected = document.contains("asanaToken") && 
+                    boolean isConnected = document.contains("asanaToken") &&
                                         document.getBoolean("asanaConnected") == Boolean.TRUE;
                     updateAsanaConnectionUI(connectAsanaButton, isConnected);
                 })
                 .addOnFailureListener(e -> Toast.makeText(this,
-                    "Błąd podczas sprawdzania połączenia z Asana", 
+                    "Błąd podczas sprawdzania połączenia z Asana",
                     Toast.LENGTH_SHORT).show());
         }
 
@@ -219,11 +218,6 @@ public class MainActivity extends AppCompatActivity {
             }
             profileBottomSheet.dismiss();
         });
-
-        // Obsługa przycisku Toggl
-        if (connectTogglButton != null) {
-            connectTogglButton.setOnClickListener(v -> showTogglApiKeyDialog());
-        }
 
         // Obsługa przełącznika ciemnego motywu
         darkModeSwitch.setChecked(AppCompatDelegate.getDefaultNightMode() == AppCompatDelegate.MODE_NIGHT_YES);
@@ -278,7 +272,7 @@ public class MainActivity extends AppCompatActivity {
                 Toast.makeText(this, "Rozłączono z Asana!", Toast.LENGTH_SHORT).show();
                 updateAsanaConnectionUI(button, false);
             })
-            .addOnFailureListener(e -> Toast.makeText(this, 
+            .addOnFailureListener(e -> Toast.makeText(this,
                 "Błąd podczas rozłączania z Asana: " + e.getMessage(), Toast.LENGTH_LONG).show());
         }
     }
@@ -309,7 +303,7 @@ public class MainActivity extends AppCompatActivity {
                         }
                         loadAsanaTasks();
                     })
-                    .addOnFailureListener(e -> Toast.makeText(this, 
+                    .addOnFailureListener(e -> Toast.makeText(this,
                         "Błąd zapisu tokena Asana: " + e.getMessage(), Toast.LENGTH_LONG).show());
                 }
             });
@@ -344,7 +338,7 @@ public class MainActivity extends AppCompatActivity {
                         @Override
                         public void onFailure(okhttp3.Call call, java.io.IOException e) {
                             Log.e(TAG, "Błąd pobierania workspaces: " + e.getMessage(), e);
-                            runOnUiThread(() -> Toast.makeText(MainActivity.this, 
+                            runOnUiThread(() -> Toast.makeText(MainActivity.this,
                                 "Błąd pobierania workspaces: " + e.getMessage(), Toast.LENGTH_LONG).show());
                         }
 
@@ -362,7 +356,7 @@ public class MainActivity extends AppCompatActivity {
                                             @Override
                                             public void onFailure(okhttp3.Call call, java.io.IOException e) {
                                                 Log.e(TAG, "Błąd pobierania projektów: " + e.getMessage(), e);
-                                                runOnUiThread(() -> Toast.makeText(MainActivity.this, 
+                                                runOnUiThread(() -> Toast.makeText(MainActivity.this,
                                                     "Błąd pobierania projektów: " + e.getMessage(), Toast.LENGTH_LONG).show());
                                             }
 
@@ -380,7 +374,7 @@ public class MainActivity extends AppCompatActivity {
                                                                 @Override
                                                                 public void onFailure(okhttp3.Call call, java.io.IOException e) {
                                                                     Log.e(TAG, "Błąd pobierania zadań: " + e.getMessage(), e);
-                                                                    runOnUiThread(() -> Toast.makeText(MainActivity.this, 
+                                                                    runOnUiThread(() -> Toast.makeText(MainActivity.this,
                                                                         "Błąd pobierania zadań: " + e.getMessage(), Toast.LENGTH_LONG).show());
                                                                 }
 
@@ -470,7 +464,7 @@ public class MainActivity extends AppCompatActivity {
                 .addOnSuccessListener(queryDocumentSnapshots -> {
                     for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
                         Task task = document.toObject(Task.class);
-                        
+
                         if (task.getAsanaId() != null) {
                             // Update existing task in Asana
                             updateTaskInAsana(token, task);
@@ -491,7 +485,7 @@ public class MainActivity extends AppCompatActivity {
             taskData.put("name", task.getName());
             taskData.put("notes", task.getDescription());
             taskData.put("completed", task.getStatus().equals("Ukończone"));
-            
+
             if (task.getDueDate() != null) {
                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
                 taskData.put("due_on", sdf.format(task.getDueDate()));
@@ -509,13 +503,13 @@ public class MainActivity extends AppCompatActivity {
                         // Mark task as synced
                         task.setNeedsSync(false);
                         task.setLastSyncDate(new Date());
-                        
+
                         firestore.collection("users")
                                 .document(user.getUid())
                                 .collection("tasks")
                                 .document(task.getId())
                                 .set(task);
-                                
+
                         Log.d(TAG, "Zadanie zaktualizowane w Asana: " + task.getName());
                     } else {
                         Log.e(TAG, "Błąd aktualizacji zadania w Asana: " + response.code());
@@ -534,7 +528,7 @@ public class MainActivity extends AppCompatActivity {
             taskData.put("notes", task.getDescription());
             taskData.put("projects", new JSONArray().put(projectId));
             taskData.put("completed", task.getStatus().equals("Ukończone"));
-            
+
             if (task.getDueDate() != null) {
                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
                 taskData.put("due_on", sdf.format(task.getDueDate()));
@@ -554,19 +548,19 @@ public class MainActivity extends AppCompatActivity {
                             JSONObject json = new JSONObject(responseBody);
                             JSONObject data = json.getJSONObject("data");
                             String asanaId = data.getString("gid");
-                            
+
                             // Update task with Asana ID
                             task.setAsanaId(asanaId);
                             task.setNeedsSync(false);
                             task.setLastSyncDate(new Date());
                             task.setSource("asana");
-                            
+
                             firestore.collection("users")
                                     .document(user.getUid())
                                     .collection("tasks")
                                     .document(task.getId())
                                     .set(task);
-                                    
+
                             Log.d(TAG, "Zadanie utworzone w Asana: " + task.getName());
                         } catch (JSONException e) {
                             Log.e(TAG, "Błąd parsowania odpowiedzi z Asana: " + e.getMessage());
@@ -586,18 +580,18 @@ public class MainActivity extends AppCompatActivity {
             firestore.collection("users").document(user.getUid())
                 .get()
                 .addOnSuccessListener(document -> {
-                    boolean isConnected = document.contains("asanaToken") && 
+                    boolean isConnected = document.contains("asanaToken") &&
                                         document.getBoolean("asanaConnected") == Boolean.TRUE;
                     if (isConnected) {
                         loadAsanaTasks();
                     } else {
-                        Toast.makeText(this, 
-                            "Połącz najpierw konto z Asana. Kliknij ikonę profilu w prawym górnym rogu.", 
+                        Toast.makeText(this,
+                            "Połącz najpierw konto z Asana. Kliknij ikonę profilu w prawym górnym rogu.",
                             Toast.LENGTH_LONG).show();
                     }
                 })
                 .addOnFailureListener(e -> Toast.makeText(this,
-                    "Błąd podczas sprawdzania połączenia z Asana", 
+                    "Błąd podczas sprawdzania połączenia z Asana",
                     Toast.LENGTH_SHORT).show());
         }
     }
@@ -681,27 +675,5 @@ public class MainActivity extends AppCompatActivity {
         }
 
         return super.onOptionsItemSelected(item);
-    }
-
-    private void showTogglApiKeyDialog() {
-        android.widget.EditText input = new android.widget.EditText(this);
-        input.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        input.setHint("Wklej swój Toggl API Key");
-
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("Połącz z Toggl")
-            .setView(input)
-            .setPositiveButton("Zapisz", (dialog, which) -> {
-                String apiKey = input.getText().toString();
-                saveTogglApiKey(apiKey);
-            })
-            .setNegativeButton("Anuluj", null)
-            .show();
-    }
-
-    private void saveTogglApiKey(String apiKey) {
-        android.content.SharedPreferences prefs = getSharedPreferences("toggl_prefs", MODE_PRIVATE);
-        prefs.edit().putString("api_key", apiKey).apply();
-        Toast.makeText(this, "Zapisano API Key Toggl", Toast.LENGTH_SHORT).show();
     }
 }
