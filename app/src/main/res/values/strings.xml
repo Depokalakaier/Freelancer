@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Freelancera</string>
+    <string name="app_name">Fleekly</string>
     
     <string-array name="task_status_filter">
         <item>Wszystkie</item>

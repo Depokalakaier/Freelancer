@@ -83,7 +83,16 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
             
             if (task.getDueDate() != null) {
                 SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy", Locale.getDefault());
-                dueDateText.setText(sdf.format(task.getDueDate()));
+                java.util.Date today = new java.util.Date();
+                java.util.Date due = task.getDueDate();
+                long diff = (today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24);
+                if (due.before(today)) {
+                    dueDateText.setText("" + Math.abs(diff) + " dni po terminie");
+                    dueDateText.setTextColor(ContextCompat.getColor(itemView.getContext(), android.R.color.holo_red_dark));
+                } else {
+                    dueDateText.setText("Do: " + sdf.format(due));
+                    dueDateText.setTextColor(ContextCompat.getColor(itemView.getContext(), android.R.color.secondary_text_dark_nodisable));
+                }
                 dueDateText.setVisibility(View.VISIBLE);
             } else {
                 dueDateText.setVisibility(View.GONE);

@@ -51,6 +51,9 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import android.util.Log;
+import com.google.android.material.textfield.TextInputEditText;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
 public class TaskListFragment extends Fragment {
     private static final String TAG = "TaskListFragment";
@@ -59,8 +62,9 @@ public class TaskListFragment extends Fragment {
     private RecyclerView recyclerView;
     private SwipeRefreshLayout swipeRefreshLayout;
     private ChipGroup statusFilterGroup;
-    private AutoCompleteTextView sortByDropdown;
-    private MaterialButton sortDirectionButton;
+    private TextInputEditText searchEditText;
+    private LinearLayout filtersPanel;
+    private TextView btnToggleFilters;
 
     // Adapter
     private TaskAdapter adapter;
@@ -68,8 +72,6 @@ public class TaskListFragment extends Fragment {
     // Data
     private List<Task> allTasks = new ArrayList<>();
     private String currentStatus = "all";
-    private String currentSortField = "name";
-    private boolean isAscending = true;
 
     // Firebase
     private FirebaseFirestore firestore;
@@ -89,8 +91,9 @@ public class TaskListFragment extends Fragment {
         recyclerView = view.findViewById(R.id.tasks_recycler_view);
         swipeRefreshLayout = view.findViewById(R.id.swipe_refresh_layout);
         statusFilterGroup = view.findViewById(R.id.status_filter_group);
-        sortByDropdown = view.findViewById(R.id.sort_by_dropdown);
-        sortDirectionButton = view.findViewById(R.id.btn_sort_direction);
+        searchEditText = view.findViewById(R.id.search_edit_text);
+        filtersPanel = view.findViewById(R.id.filters_panel);
+        btnToggleFilters = view.findViewById(R.id.btn_toggle_filters);
 
         // Setup RecyclerView
         adapter = new TaskAdapter(new ArrayList<>(), task -> {
@@ -115,12 +118,42 @@ public class TaskListFragment extends Fragment {
             android.R.color.holo_red_light
         );
 
-        // Setup filters and sorting
+        // Setup filters
         setupFilters();
-        setupSorting();
 
         // Initial data load - only load local tasks
         loadTasksFromFirestore(user.getUid());
+
+        // Obsługa wyszukiwania
+        if (searchEditText != null) {
+            searchEditText.addTextChangedListener(new android.text.TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    filterAndSortTasks();
+                }
+                @Override
+                public void afterTextChanged(android.text.Editable s) {}
+            });
+        }
+
+        if (btnToggleFilters != null && filtersPanel != null) {
+            btnToggleFilters.setOnClickListener(v -> {
+                if (filtersPanel.getVisibility() == View.VISIBLE) {
+                    filtersPanel.animate().alpha(0f).setDuration(200).withEndAction(() -> {
+                        filtersPanel.setVisibility(View.GONE);
+                        filtersPanel.setAlpha(1f);
+                    });
+                    btnToggleFilters.setCompoundDrawablesWithIntrinsicBounds(0, 0, R.drawable.ic_arrow_drop_down_24, 0);
+                } else {
+                    filtersPanel.setAlpha(0f);
+                    filtersPanel.setVisibility(View.VISIBLE);
+                    filtersPanel.animate().alpha(1f).setDuration(200).start();
+                    btnToggleFilters.setCompoundDrawablesWithIntrinsicBounds(0, 0, R.drawable.ic_arrow_drop_up_24, 0);
+                }
+            });
+        }
 
         return view;
     }
@@ -568,52 +601,25 @@ public class TaskListFragment extends Fragment {
 
     private void setupFilters() {
         statusFilterGroup.setOnCheckedChangeListener((group, checkedId) -> {
-            if (checkedId == R.id.chip_all) {
-                currentStatus = "all";
-            } else if (checkedId == R.id.chip_new) {
+            for (int i = 0; i < group.getChildCount(); i++) {
+                com.google.android.material.chip.Chip chip = (com.google.android.material.chip.Chip) group.getChildAt(i);
+                chip.setChipBackgroundColorResource(android.R.color.transparent);
+                chip.setTextColor(getResources().getColor(R.color.gray, null));
+            }
+            com.google.android.material.chip.Chip selectedChip = group.findViewById(checkedId);
+            if (selectedChip != null) {
+                selectedChip.setChipBackgroundColorResource(android.R.color.white);
+                selectedChip.setTextColor(getResources().getColor(android.R.color.black, null));
+            }
+            if (checkedId == R.id.chip_new) {
                 currentStatus = "Nowe";
             } else if (checkedId == R.id.chip_in_progress) {
                 currentStatus = "W toku";
             } else if (checkedId == R.id.chip_completed) {
                 currentStatus = "Ukończone";
+            } else if (checkedId == R.id.chip_due) {
+                currentStatus = "Termin";
             }
-            filterAndSortTasks();
-        });
-    }
-
-    private void setupSorting() {
-        String[] sortOptions = new String[]{"Nazwa", "Data utworzenia", "Termin", "Status", "Klient"};
-        ArrayAdapter<String> dropdownAdapter = new ArrayAdapter<>(
-                requireContext(),
-                android.R.layout.simple_dropdown_item_1line,
-                sortOptions
-        );
-        sortByDropdown.setAdapter(dropdownAdapter);
-        
-        sortByDropdown.setOnItemClickListener((parent, view, position, id) -> {
-            switch (position) {
-                case 0:
-                    currentSortField = "name";
-                    break;
-                case 1:
-                    currentSortField = "createdAt";
-                    break;
-                case 2:
-                    currentSortField = "dueDate";
-                    break;
-                case 3:
-                    currentSortField = "status";
-                    break;
-                case 4:
-                    currentSortField = "client";
-                    break;
-            }
-            filterAndSortTasks();
-        });
-
-        sortDirectionButton.setOnClickListener(v -> {
-            isAscending = !isAscending;
-            sortDirectionButton.setText(isAscending ? "↓" : "↑");
             filterAndSortTasks();
         });
     }
@@ -623,44 +629,30 @@ public class TaskListFragment extends Fragment {
 
         // Filtrowanie po statusie
         if (!"all".equals(currentStatus)) {
-            filteredTasks.removeIf(task -> !currentStatus.equals(task.getStatus()));
+            filteredTasks.removeIf(task -> !currentStatus.equals(task.getStatus()) && !(currentStatus.equals("Termin") && task.getDueDate() != null));
         }
 
-        // Sortowanie
-        filteredTasks.sort((task1, task2) -> {
-            int result = 0;
-            switch (currentSortField) {
-                case "name":
-                    result = compareStrings(task1.getName(), task2.getName());
-                    break;
-                case "createdAt":
-                    result = compareDates(task1.getCreatedAt(), task2.getCreatedAt());
-                    break;
-                case "dueDate":
-                    result = compareDates(task1.getDueDate(), task2.getDueDate());
-                    break;
-                case "status":
-                    result = compareStrings(task1.getStatus(), task2.getStatus());
-                    break;
-                case "client":
-                    result = compareStrings(task1.getClient(), task2.getClient());
-                    break;
+        // Filtrowanie po wyszukiwaniu
+        if (searchEditText != null && searchEditText.getText() != null) {
+            String query = searchEditText.getText().toString().toLowerCase();
+            if (!query.isEmpty()) {
+                filteredTasks.removeIf(task -> task.getName() == null || !task.getName().toLowerCase().contains(query));
             }
-            return isAscending ? result : -result;
+        }
+
+        // Sortowanie: Ukończone na dole, Nowe i W toku na górze
+        filteredTasks.sort((t1, t2) -> {
+            boolean t1Done = "Ukończone".equals(t1.getStatus());
+            boolean t2Done = "Ukończone".equals(t2.getStatus());
+            if (t1Done && !t2Done) return 1;
+            if (!t1Done && t2Done) return -1;
+            // Pozostałe sortuj po dacie utworzenia malejąco
+            if (t1.getCreatedAt() == null && t2.getCreatedAt() == null) return 0;
+            if (t1.getCreatedAt() == null) return 1;
+            if (t2.getCreatedAt() == null) return -1;
+            return t2.getCreatedAt().compareTo(t1.getCreatedAt());
         });
 
         adapter.updateTasks(filteredTasks);
-    }
-
-    private int compareStrings(String s1, String s2) {
-        if (s1 == null) return s2 == null ? 0 : 1;
-        if (s2 == null) return -1;
-        return s1.compareTo(s2);
-    }
-
-    private int compareDates(Date d1, Date d2) {
-        if (d1 == null) return d2 == null ? 0 : 1;
-        if (d2 == null) return -1;
-        return d1.compareTo(d2);
     }
 }

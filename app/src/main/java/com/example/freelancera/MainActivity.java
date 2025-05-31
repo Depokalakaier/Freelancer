@@ -130,27 +130,29 @@ public class MainActivity extends AppCompatActivity {
     private void setupToolbar() {
         Toolbar toolbar = findViewById(R.id.toolbar);
         if (toolbar != null) {
-            toolbar.setTitle("");  // Pusty tytuł, bo mamy własny TextView
+            toolbar.setTitle("");
             setSupportActionBar(toolbar);
-            
-            // Ustawienie tytułu w TextView
+
+            // Wyśrodkuj tytuł
             TextView toolbarTitle = toolbar.findViewById(R.id.toolbarTitle);
             if (toolbarTitle != null) {
-                toolbarTitle.setText(getString(R.string.app_name));
+                toolbarTitle.setText("Fleekly");
+                toolbarTitle.setGravity(android.view.Gravity.START | android.view.Gravity.CENTER_VERTICAL);
             }
 
-            // Ustawienie ikony profilu
+            // Ikona profilu
             ShapeableImageView profileIcon = toolbar.findViewById(R.id.profileIcon);
             if (profileIcon != null) {
                 profileIcon.setOnClickListener(v -> showProfileBottomSheet());
-                
-                // Załaduj zdjęcie profilowe jeśli istnieje
+                // Załaduj zdjęcie profilowe jeśli istnieje, w przeciwnym razie domyślna ikona aplikacji
                 if (user != null && user.getPhotoUrl() != null) {
                     Glide.with(this)
                         .load(user.getPhotoUrl())
-                        .placeholder(R.drawable.ic_account_circle_24)
-                        .error(R.drawable.ic_account_circle_24)
+                        .placeholder(R.mipmap.ic_launcher)
+                        .error(R.mipmap.ic_launcher)
                         .into(profileIcon);
+                } else {
+                    profileIcon.setImageResource(R.mipmap.ic_launcher);
                 }
             }
         }
@@ -166,10 +168,18 @@ public class MainActivity extends AppCompatActivity {
                     checkAsanaConnection();
                     return true;
                 } else if (itemId == R.id.navigation_invoices) {
-                    // TODO: Implementacja widoku faktur
+                    // Zakładka Faktury - pusta
+                    getSupportFragmentManager()
+                        .beginTransaction()
+                        .replace(R.id.fragment_container, new androidx.fragment.app.Fragment())
+                        .commit();
                     return true;
                 } else if (itemId == R.id.navigation_history) {
-                    // TODO: Implementacja widoku historii
+                    // Zakładka Historia - pusta
+                    getSupportFragmentManager()
+                        .beginTransaction()
+                        .replace(R.id.fragment_container, new androidx.fragment.app.Fragment())
+                        .commit();
                     return true;
                 }
                 return false;
@@ -681,6 +691,8 @@ public class MainActivity extends AppCompatActivity {
                             ShapeableImageView profileIcon = findViewById(R.id.profileIcon);
                             Glide.with(this)
                                 .load(uri)
+                                .placeholder(R.mipmap.ic_launcher)
+                                .error(R.mipmap.ic_launcher)
                                 .circleCrop()
                                 .into(profileIcon);
                             // Odśwież bottom sheet
@@ -695,46 +707,5 @@ public class MainActivity extends AppCompatActivity {
             })
             .addOnFailureListener(e -> Toast.makeText(MainActivity.this,
                 "Błąd przesyłania zdjęcia: " + e.getMessage(), Toast.LENGTH_LONG).show());
-    }
-
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.menu_profile, menu);
-
-        try {
-            // Dynamiczne ustawienie nazwy użytkownika w submenu profilu
-            MenuItem profileItem = menu.findItem(R.id.action_profile);
-            if (profileItem != null) {
-                SubMenu subMenu = profileItem.getSubMenu();
-                if (subMenu != null && user != null) {
-                    MenuItem usernameItem = subMenu.findItem(R.id.menu_username);
-                    if (usernameItem != null) {
-                        String displayName = user.getDisplayName();
-                        String email = user.getEmail();
-                        String toShow = (displayName != null && !displayName.isEmpty()) ? displayName : email;
-                        usernameItem.setTitle(toShow != null ? toShow : "Użytkownik");
-                    }
-                }
-            }
-        } catch (Exception e) {
-            Log.e("MainActivity", "Błąd podczas tworzenia menu: " + e.getMessage());
-        }
-
-        return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        int id = item.getItemId();
-
-        if (id == R.id.menu_settings) {
-            startActivity(new Intent(this, SettingsActivity.class));
-            return true;
-        } else if (id == R.id.menu_logout) {
-            logout();
-            return true;
-        }
-
-        return super.onOptionsItemSelected(item);
     }
 }

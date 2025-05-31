@@ -5,6 +5,29 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
+    <!-- Przycisk Filtry -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="start|center_vertical"
+        android:paddingStart="16dp"
+        android:paddingTop="8dp">
+        <TextView
+            android:id="@+id/btn_toggle_filters"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Filtry"
+            android:textColor="#888888"
+            android:textSize="14sp"
+            android:drawableEnd="@drawable/ic_arrow_drop_down_24"
+            android:drawablePadding="4dp"
+            android:paddingEnd="8dp"
+            android:fontFamily="sans-serif-medium"
+            android:clickable="true"
+            android:focusable="true"/>
+    </LinearLayout>
+
     <!-- Panel filtrowania -->
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
@@ -14,10 +37,12 @@
         app:cardCornerRadius="8dp">
 
         <LinearLayout
+            android:id="@+id/filters_panel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="8dp">
+            android:padding="8dp"
+            android:visibility="gone">
 
             <TextView
                 android:layout_width="wrap_content"
@@ -26,6 +51,21 @@
                 android:textStyle="bold"
                 android:layout_marginBottom="8dp"/>
 
+            <!-- Pole wyszukiwania -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/search_layout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Wyszukaj zadanie"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/search_edit_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:drawableStart="@android:drawable/ic_menu_search"
+                    android:inputType="text"/>
+            </com.google.android.material.textfield.TextInputLayout>
+
             <com.google.android.material.chip.ChipGroup
                 android:id="@+id/status_filter_group"
                 android:layout_width="match_parent"
@@ -33,17 +73,11 @@
                 app:singleSelection="true">
 
                 <com.google.android.material.chip.Chip
-                    android:id="@+id/chip_all"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Wszystkie"
-                    android:checked="true"/>
-
-                <com.google.android.material.chip.Chip
                     android:id="@+id/chip_new"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Nowe"/>
+                    android:text="Nowe"
+                    android:checked="true"/>
 
                 <com.google.android.material.chip.Chip
                     android:id="@+id/chip_in_progress"
@@ -56,38 +90,13 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Ukończone"/>
-            </com.google.android.material.chip.ChipGroup>
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="8dp">
-
-                <com.google.android.material.textfield.TextInputLayout
-                    android:id="@+id/sort_by_layout"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="8dp"
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
-                    android:hint="Sortuj według">
-
-                    <AutoCompleteTextView
-                        android:id="@+id/sort_by_dropdown"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="none"/>
-
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_sort_direction"
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chip_due"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="↓"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
-            </LinearLayout>
+                    android:text="Termin"/>
+            </com.google.android.material.chip.ChipGroup>
 
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
