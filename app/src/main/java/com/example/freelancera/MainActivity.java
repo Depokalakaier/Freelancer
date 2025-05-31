@@ -105,15 +105,16 @@ public class MainActivity extends AppCompatActivity {
             } else if (data.getScheme().equals("myapp") && data.getHost().equals("callback")) {
                 String token = data.getQueryParameter("token");
                 if (token != null && user != null) {
-                    // Zapisz do Firestore
+                    // Zapisz do Firestore ZAWSZE
                     firestore.collection("users").document(user.getUid())
                         .update("togglToken", token)
-                        .addOnSuccessListener(unused -> Log.d(TAG, "Toggl token zapisany w Firestore"))
+                        .addOnSuccessListener(unused -> Log.d(TAG, "Toggl token zapisany w Firestore: " + token))
                         .addOnFailureListener(e -> Log.e(TAG, "Błąd zapisu Toggl token: " + e.getMessage()));
                     // Zapisz do SharedPreferences
                     getSharedPreferences("toggl_prefs", MODE_PRIVATE)
                         .edit().putString("api_key", token).apply();
-                    // Weryfikacja API Key Toggl
+
+                    // Weryfikacja API Key Toggl (tylko Toast i logi)
                     okhttp3.OkHttpClient client = new okhttp3.OkHttpClient();
                     okhttp3.Request request = new okhttp3.Request.Builder()
                         .url("https://api.track.toggl.com/api/v9/me")
@@ -122,10 +123,13 @@ public class MainActivity extends AppCompatActivity {
                     client.newCall(request).enqueue(new okhttp3.Callback() {
                         @Override
                         public void onFailure(okhttp3.Call call, java.io.IOException e) {
+                            Log.e(TAG, "Toggl API connection error: " + e.getMessage());
                             runOnUiThread(() -> Toast.makeText(MainActivity.this, "Błąd połączenia z Toggl: " + e.getMessage(), Toast.LENGTH_LONG).show());
                         }
                         @Override
                         public void onResponse(okhttp3.Call call, okhttp3.Response response) throws java.io.IOException {
+                            String body = response.body() != null ? response.body().string() : "";
+                            Log.d(TAG, "Toggl API response: " + response.code() + " " + body);
                             runOnUiThread(() -> {
                                 if (response.isSuccessful()) {
                                     Toast.makeText(MainActivity.this, "Połączono z Toggl!", Toast.LENGTH_LONG).show();
