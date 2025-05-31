@@ -74,6 +74,21 @@ public class MainActivity extends AppCompatActivity {
 
         // Inicjalizacja image picker
         setupImagePicker();
+
+        // Otwórz od razu fragment z zadaniami po zalogowaniu
+        if (user != null && savedInstanceState == null) {
+            getSupportFragmentManager()
+                .beginTransaction()
+                .replace(R.id.fragment_container, new com.example.freelancera.view.TaskListFragment())
+                .commit();
+            // Odśwież zadania po 5 sekundach od startu
+            new android.os.Handler().postDelayed(() -> {
+                com.example.freelancera.view.TaskListFragment fragment = (com.example.freelancera.view.TaskListFragment) getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+                if (fragment != null) {
+                    fragment.fetchAndSyncTasksFromAsana();
+                }
+            }, 5000);
+        }
     }
 
     @Override
