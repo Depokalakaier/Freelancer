@@ -84,7 +84,7 @@
     <div id="msg"></div>
   </div>
   <script>
-    async function connect() {
+    function connect() {
       const token = document.getElementById('token').value.trim();
       const msg = document.getElementById('msg');
       if (!token || token.length < 20) {
@@ -92,33 +92,14 @@
         msg.className = 'error';
         return;
       }
-      msg.textContent = 'Sprawdzanie klucza...';
+      msg.textContent = 'Przekierowywanie...';
       msg.className = 'info';
-      try {
-        const res = await fetch('https://api.track.toggl.com/api/v9/me', {
-          method: 'GET',
-          headers: {
-            'Authorization': 'Basic ' + btoa(token + ':api_token'),
-            'Content-Type': 'application/json'
-          }
-        });
-        if (res.ok) {
-          msg.textContent = 'Połączono! Przekierowywanie...';
-          msg.className = 'success';
-          setTimeout(() => {
-            const redirect = "myapp://callback?token=" + encodeURIComponent(token);
-            window.location.href = redirect;
-            msg.textContent = 'Jeśli aplikacja się nie otworzy, wróć i spróbuj ponownie.';
-            msg.className = 'success';
-          }, 700);
-        } else {
-          msg.textContent = 'Niepoprawny API Token lub brak uprawnień.';
-          msg.className = 'error';
-        }
-      } catch (e) {
-        msg.textContent = 'Błąd połączenia z API Toggl.';
-        msg.className = 'error';
-      }
+      setTimeout(() => {
+        const redirect = "myapp://callback?token=" + encodeURIComponent(token);
+        window.location.href = redirect;
+        msg.textContent = 'Jeśli aplikacja się nie otworzy, wróć i spróbuj ponownie.';
+        msg.className = 'success';
+      }, 500);
     }
     document.getElementById('token').addEventListener('keyup', function(e) {
       if (e.key === 'Enter') connect();

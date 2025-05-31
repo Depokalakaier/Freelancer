@@ -158,7 +158,7 @@ public class TaskListFragment extends Fragment {
         return view;
     }
 
-    private void fetchAndSyncTasksFromAsana() {
+    public void fetchAndSyncTasksFromAsana() {
         if (user == null) {
             Log.e(TAG, "fetchAndSyncTasksFromAsana: user is null");
             swipeRefreshLayout.setRefreshing(false);

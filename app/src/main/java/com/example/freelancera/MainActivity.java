@@ -113,7 +113,28 @@ public class MainActivity extends AppCompatActivity {
                     // Zapisz do SharedPreferences
                     getSharedPreferences("toggl_prefs", MODE_PRIVATE)
                         .edit().putString("api_key", token).apply();
-                    Toast.makeText(this, "Połączono z Toggl!", Toast.LENGTH_LONG).show();
+                    // Weryfikacja API Key Toggl
+                    okhttp3.OkHttpClient client = new okhttp3.OkHttpClient();
+                    okhttp3.Request request = new okhttp3.Request.Builder()
+                        .url("https://api.track.toggl.com/api/v9/me")
+                        .addHeader("Authorization", okhttp3.Credentials.basic(token, "api_token"))
+                        .build();
+                    client.newCall(request).enqueue(new okhttp3.Callback() {
+                        @Override
+                        public void onFailure(okhttp3.Call call, java.io.IOException e) {
+                            runOnUiThread(() -> Toast.makeText(MainActivity.this, "Błąd połączenia z Toggl: " + e.getMessage(), Toast.LENGTH_LONG).show());
+                        }
+                        @Override
+                        public void onResponse(okhttp3.Call call, okhttp3.Response response) throws java.io.IOException {
+                            runOnUiThread(() -> {
+                                if (response.isSuccessful()) {
+                                    Toast.makeText(MainActivity.this, "Połączono z Toggl!", Toast.LENGTH_LONG).show();
+                                } else {
+                                    Toast.makeText(MainActivity.this, "Niepoprawny API Key Toggl!", Toast.LENGTH_LONG).show();
+                                }
+                            });
+                        }
+                    });
                     // Odśwież profil, jeśli otwarty
                     if (profileBottomSheet != null && profileBottomSheet.isShowing()) {
                         profileBottomSheet.dismiss();
