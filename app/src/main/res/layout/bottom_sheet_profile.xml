@@ -36,6 +36,14 @@
         android:text="Połącz konto z Asana"
         style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
 
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/connectTogglButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:text="Połącz z Toggl"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+
     <com.google.android.material.switchmaterial.SwitchMaterial
         android:id="@+id/darkModeSwitch"
         android:layout_width="match_parent"

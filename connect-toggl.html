@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <title>Connect to Toggl</title>
+</head>
+<body>
+<h1>Połącz z Toggl</h1>
+<p>Wklej swój <strong>API Token</strong> z <a href="https://track.toggl.com/profile" target="_blank">Toggl Profile</a></p>
+<input id="token" type="text" placeholder="API Token" />
+<button onclick="connect()">Połącz</button>
+
+<script>
+    function connect() {
+      const token = document.getElementById('token').value;
+      const redirect = "myapp://callback?token=" + token;
+      window.location.href = redirect;
+    }
+</script>
+</body>
+</html>

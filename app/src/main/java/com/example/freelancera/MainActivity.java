@@ -182,6 +182,7 @@ public class MainActivity extends AppCompatActivity {
         SwitchMaterial darkModeSwitch = bottomSheetView.findViewById(R.id.darkModeSwitch);
         MaterialButton changePasswordButton = bottomSheetView.findViewById(R.id.changePasswordButton);
         MaterialButton logoutButton = bottomSheetView.findViewById(R.id.logoutButton);
+        MaterialButton connectTogglButton = bottomSheetView.findViewById(R.id.connectTogglButton);
 
         // Ustawienie emaila użytkownika
         if (user != null && user.getEmail() != null) {
@@ -218,6 +219,11 @@ public class MainActivity extends AppCompatActivity {
             }
             profileBottomSheet.dismiss();
         });
+
+        // Obsługa przycisku Toggl
+        if (connectTogglButton != null) {
+            connectTogglButton.setOnClickListener(v -> showTogglApiKeyDialog());
+        }
 
         // Obsługa przełącznika ciemnego motywu
         darkModeSwitch.setChecked(AppCompatDelegate.getDefaultNightMode() == AppCompatDelegate.MODE_NIGHT_YES);
@@ -675,5 +681,27 @@ public class MainActivity extends AppCompatActivity {
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+    private void showTogglApiKeyDialog() {
+        android.widget.EditText input = new android.widget.EditText(this);
+        input.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        input.setHint("Wklej swój Toggl API Key");
+
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Połącz z Toggl")
+            .setView(input)
+            .setPositiveButton("Zapisz", (dialog, which) -> {
+                String apiKey = input.getText().toString();
+                saveTogglApiKey(apiKey);
+            })
+            .setNegativeButton("Anuluj", null)
+            .show();
+    }
+
+    private void saveTogglApiKey(String apiKey) {
+        android.content.SharedPreferences prefs = getSharedPreferences("toggl_prefs", MODE_PRIVATE);
+        prefs.edit().putString("api_key", apiKey).apply();
+        Toast.makeText(this, "Zapisano API Key Toggl", Toast.LENGTH_SHORT).show();
     }
 }
