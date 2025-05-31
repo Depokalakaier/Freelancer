@@ -2,14 +2,16 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
         android:id="@+id/navigation_tasks"
-        android:icon="@drawable/ic_task_24"
-        android:title="Zadania"/>
+        android:icon="@drawable/ic_task"
+        android:title="Zadania" />
+
     <item
         android:id="@+id/navigation_invoices"
-        android:icon="@drawable/ic_receipt_24"
-        android:title="Faktury"/>
+        android:icon="@drawable/ic_invoice"
+        android:title="Faktury" />
+
     <item
-        android:id="@+id/navigation_history"
-        android:icon="@drawable/ic_history_24"
-        android:title="Historia"/>
+        android:id="@+id/navigation_settings"
+        android:icon="@android:drawable/ic_menu_preferences"
+        android:title="Ustawienia" />
 </menu>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Task status colors - dark theme -->
+    <color name="task_new">#3949AB</color>          <!-- Ciemniejszy indygo -->
+    <color name="task_in_progress">#2E7D32</color>  <!-- Ciemniejsza zieleń -->
+    <color name="task_completed">#6A1B9A</color>    <!-- Ciemniejszy fiolet -->
+    <color name="task_default">#424242</color>      <!-- Ciemny szary -->
+
+    <!-- Theme colors -->
+    <color name="primary">@color/primary_dark</color>
+    <color name="primary_variant">@color/primary_variant_dark</color>
+    <color name="secondary">@color/secondary_dark</color>
+    <color name="secondary_variant">@color/secondary_variant_dark</color>
+    <color name="background">@color/background_dark</color>
+    <color name="surface">@color/surface_dark</color>
+    <color name="on_surface">@color/on_surface_dark</color>
+    <color name="status_bar">@color/status_bar_dark</color>
+</resources> 

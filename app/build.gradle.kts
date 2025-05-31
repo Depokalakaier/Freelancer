@@ -8,7 +8,6 @@ android {
     compileSdk = 35
 
     defaultConfig {
-
         applicationId = "com.example.freelancera"
         minSdk = 24
         targetSdk = 34
@@ -49,6 +48,8 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
     implementation(platform("com.google.firebase:firebase-bom:33.14.0"))
     implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.android.gms:play-services-auth:20.7.0")
+    implementation("com.google.android.gms:play-services-base:18.3.0")
     implementation("com.github.bumptech.glide:glide:4.15.1")
     implementation(libs.swiperefreshlayout)
     annotationProcessor("com.github.bumptech.glide:compiler:4.15.1")

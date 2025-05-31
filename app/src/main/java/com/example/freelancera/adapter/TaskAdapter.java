@@ -1,24 +1,32 @@
 package com.example.freelancera.adapter;
 
+import android.content.res.Configuration;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 import com.example.freelancera.R;
 import com.example.freelancera.models.Task;
+import com.google.android.material.card.MaterialCardView;
 import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.Locale;
 
 public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder> {
+    
     private List<Task> tasks;
-    private final SimpleDateFormat dateFormat;
+    private final OnTaskClickListener listener;
 
-    public TaskAdapter(List<Task> tasks) {
+    public interface OnTaskClickListener {
+        void onTaskClick(Task task);
+    }
+
+    public TaskAdapter(List<Task> tasks, OnTaskClickListener listener) {
         this.tasks = tasks;
-        this.dateFormat = new SimpleDateFormat("dd.MM.yyyy", Locale.getDefault());
+        this.listener = listener;
     }
 
     @NonNull
@@ -32,7 +40,7 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
     @Override
     public void onBindViewHolder(@NonNull TaskViewHolder holder, int position) {
         Task task = tasks.get(position);
-        holder.bind(task);
+        holder.bind(task, listener);
     }
 
     @Override
@@ -45,72 +53,79 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
         notifyDataSetChanged();
     }
 
-    class TaskViewHolder extends RecyclerView.ViewHolder {
-        private final TextView taskNameTextView;
-        private final TextView taskStatusTextView;
-        private final TextView taskDueDateTextView;
-        private final TextView taskClientTextView;
-        private final TextView taskRateTextView;
+    static class TaskViewHolder extends RecyclerView.ViewHolder {
+        private static final String TAG = "TaskAdapter";
+        private final MaterialCardView cardView;
+        private final TextView titleText;
+        private final TextView statusText;
+        private final TextView clientText;
+        private final TextView dueDateText;
+        private final TextView timeText;
+        private final TextView amountText;
 
-        TaskViewHolder(@NonNull View itemView) {
+        TaskViewHolder(View itemView) {
             super(itemView);
-            taskNameTextView = itemView.findViewById(R.id.taskNameTextView);
-            taskStatusTextView = itemView.findViewById(R.id.taskStatusTextView);
-            taskDueDateTextView = itemView.findViewById(R.id.taskDueDateTextView);
-            taskClientTextView = itemView.findViewById(R.id.taskClientTextView);
-            taskRateTextView = itemView.findViewById(R.id.taskRateTextView);
+            cardView = (MaterialCardView) itemView;
+            titleText = itemView.findViewById(R.id.text_task_title);
+            statusText = itemView.findViewById(R.id.text_task_status);
+            clientText = itemView.findViewById(R.id.text_task_client);
+            dueDateText = itemView.findViewById(R.id.text_task_due_date);
+            timeText = itemView.findViewById(R.id.text_task_time);
+            amountText = itemView.findViewById(R.id.text_task_amount);
         }
 
-        void bind(Task task) {
-            taskNameTextView.setText(task.getName());
-            String statusText;
-            int statusColor;
-            if ("Ukończone".equals(task.getStatus())) {
-                statusText = "Ukończone";
-                statusColor = itemView.getContext().getColor(R.color.status_completed);
-            } else {
-                java.util.Calendar cal1 = java.util.Calendar.getInstance();
-                java.util.Calendar cal2 = java.util.Calendar.getInstance();
-                if (task.getCreatedAt() != null) {
-                    cal2.setTime(task.getCreatedAt());
-                    boolean isToday = cal1.get(java.util.Calendar.YEAR) == cal2.get(java.util.Calendar.YEAR)
-                            && cal1.get(java.util.Calendar.DAY_OF_YEAR) == cal2.get(java.util.Calendar.DAY_OF_YEAR);
-                    if (isToday) {
-                        statusText = "Nowe";
-                    } else {
-                        statusText = dateFormat.format(task.getCreatedAt());
-                    }
-                } else {
-                    statusText = "Nowe";
-                }
-                statusColor = itemView.getContext().getColor(R.color.status_new);
-            }
-            taskStatusTextView.setText(statusText);
-            taskStatusTextView.setTextColor(statusColor);
-
+        void bind(Task task, OnTaskClickListener listener) {
+            titleText.setText(task.getName());
+            String status = task.getStatus();
+            
+            statusText.setText(status);
+            clientText.setText(task.getClient());
+            
             if (task.getDueDate() != null) {
-                java.util.Calendar today = java.util.Calendar.getInstance();
-                java.util.Calendar due = java.util.Calendar.getInstance();
-                due.setTime(task.getDueDate());
-                boolean isToday = today.get(java.util.Calendar.YEAR) == due.get(java.util.Calendar.YEAR)
-                        && today.get(java.util.Calendar.DAY_OF_YEAR) == due.get(java.util.Calendar.DAY_OF_YEAR);
-                if (isToday) {
-                    taskDueDateTextView.setText("Do dzisiaj");
-                    taskDueDateTextView.setTextColor(itemView.getContext().getColor(R.color.status_in_progress));
-                } else if (due.after(today)) {
-                    taskDueDateTextView.setText(dateFormat.format(task.getDueDate()));
-                    taskDueDateTextView.setTextColor(itemView.getContext().getColor(R.color.status_in_progress));
-                } else {
-                    taskDueDateTextView.setText(dateFormat.format(task.getDueDate()) + "  Po terminie");
-                    taskDueDateTextView.setTextColor(itemView.getContext().getColor(android.R.color.holo_red_dark));
-                }
+                SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy", Locale.getDefault());
+                dueDateText.setText(sdf.format(task.getDueDate()));
+                dueDateText.setVisibility(View.VISIBLE);
             } else {
-                taskDueDateTextView.setText("Brak terminu");
-                taskDueDateTextView.setTextColor(itemView.getContext().getColor(R.color.status_default));
+                dueDateText.setVisibility(View.GONE);
             }
 
-            taskClientTextView.setText(task.getClient() != null ? task.getClient() : "Brak klienta");
-            taskRateTextView.setText(String.format(Locale.getDefault(), "%.2f zł/h", task.getRatePerHour()));
+            // Format time
+            long hours = task.getTotalTimeInSeconds() / 3600;
+            long minutes = (task.getTotalTimeInSeconds() % 3600) / 60;
+            timeText.setText(String.format(Locale.getDefault(), "%02d:%02d", hours, minutes));
+
+            // Format amount
+            double amount = (task.getTotalTimeInSeconds() / 3600.0) * task.getRatePerHour();
+            amountText.setText(String.format(Locale.getDefault(), "%.2f PLN", amount));
+
+            // Set card color based on status
+            int colorRes;
+            
+            switch (status) {
+                case "Nowe":
+                    colorRes = R.color.task_new;
+                    break;
+                case "W toku":
+                    colorRes = R.color.task_in_progress;
+                    break;
+                case "Ukończone":
+                    colorRes = R.color.task_completed;
+                    break;
+                default:
+                    colorRes = R.color.task_default;
+                    break;
+            }
+            
+            try {
+                int color = ContextCompat.getColor(itemView.getContext(), colorRes);
+                cardView.setCardBackgroundColor(color);
+            } catch (Exception e) {
+                android.util.Log.e(TAG, "Error setting color for task: " + task.getName(), e);
+                cardView.setCardBackgroundColor(ContextCompat.getColor(itemView.getContext(), R.color.task_default));
+            }
+
+            // Set click listener
+            itemView.setOnClickListener(v -> listener.onTaskClick(task));
         }
     }
 }

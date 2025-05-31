@@ -1,76 +1,176 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <LinearLayout
-        android:orientation="vertical"
+    <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:padding="16dp">
+        android:layout_height="wrap_content">
 
-        <TextView
-            android:id="@+id/text_task_title"
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="?attr/colorPrimary"
+            app:navigationIcon="@drawable/ic_arrow_back"
+            app:title="Szczegóły zadania"/>
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:padding="16dp"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Tytuł zadania"
-            android:textSize="22sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp"/>
+            android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/text_task_client"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Klient"
-            android:textSize="16sp"
-            android:layout_marginBottom="8dp"/>
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="8dp"
+                app:cardElevation="2dp">
 
-        <TextView
-            android:id="@+id/text_task_status"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Status"
-            android:textSize="16sp"
-            android:layout_marginBottom="8dp"/>
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
 
-        <TextView
-            android:id="@+id/text_task_desc"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Opis zadania"
-            android:layout_marginBottom="16dp"
-            android:textSize="15sp"/>
+                    <TextView
+                        android:id="@+id/text_task_title"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textSize="20sp"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="8dp"/>
 
-        <TextView
-            android:id="@+id/text_work_time"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Czas pracy: 0 godz. 0 min."
-            android:textSize="16sp"
-            android:layout_marginBottom="8dp"/>
+                    <TextView
+                        android:id="@+id/text_task_description"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textSize="14sp"
+                        android:layout_marginBottom="16dp"/>
 
-        <Button
-            android:id="@+id/btn_start_stop_work"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Rozpocznij pracę"
-            android:layout_marginBottom="12dp"/>
+                    <TextView
+                        android:id="@+id/text_task_status"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="14sp"
+                        android:layout_marginBottom="4dp"/>
 
-        <Button
-            android:id="@+id/btn_generate_invoice"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Wystaw fakturę"
-            android:layout_marginBottom="8dp"/>
+                    <TextView
+                        android:id="@+id/text_task_client"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="14sp"
+                        android:layout_marginBottom="4dp"/>
 
-        <Button
-            android:id="@+id/btn_export_pdf"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Eksportuj do PDF"
-            android:layout_marginTop="12dp"/>
+                    <TextView
+                        android:id="@+id/text_task_due_date"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="14sp"
+                        android:layout_marginBottom="16dp"/>
 
+                </LinearLayout>
 
-    </LinearLayout>
-</ScrollView>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="8dp"
+                app:cardElevation="2dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Czas pracy i wynagrodzenie"
+                        android:textStyle="bold"
+                        android:textSize="16sp"
+                        android:layout_marginBottom="8dp"/>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="16dp"
+                        android:hint="Stawka godzinowa (PLN)"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/edit_rate_per_hour"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="numberDecimal"/>
+
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <TextView
+                        android:id="@+id/text_task_time"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textSize="24sp"
+                        android:textStyle="bold"
+                        android:gravity="center"
+                        android:layout_marginBottom="8dp"/>
+
+                    <TextView
+                        android:id="@+id/text_task_amount"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textSize="20sp"
+                        android:gravity="center"
+                        android:layout_marginBottom="16dp"/>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/button_start_stop"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Start"
+                            android:layout_marginEnd="8dp"/>
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/button_complete"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Oznacz jako ukończone"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+
+                    </LinearLayout>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/button_save"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Zapisz zmiany"
+                        android:layout_marginTop="8dp"/>
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+        </LinearLayout>
+
+    </androidx.core.widget.NestedScrollView>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
