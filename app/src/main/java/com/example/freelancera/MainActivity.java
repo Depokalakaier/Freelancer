@@ -30,9 +30,12 @@ import com.google.android.material.imageview.ShapeableImageView;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.WriteBatch;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageMetadata;
 import com.google.firebase.storage.StorageReference;
@@ -47,7 +50,13 @@ import java.util.Date;
 import java.util.Locale;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Map;
+import java.util.Set;
 
+/**
+ * MainActivity - główna aktywność aplikacji Freelancer.
+ * Obsługuje nawigację, logikę startową, przełączanie zakładek i integracje z Asana/Toggl.
+ */
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
@@ -83,11 +92,12 @@ public class MainActivity extends AppCompatActivity {
                 .commit();
             // Odśwież zadania po 5 sekundach od startu
             new android.os.Handler().postDelayed(() -> {
-                com.example.freelancera.view.TaskListFragment fragment = (com.example.freelancera.view.TaskListFragment) getSupportFragmentManager().findFragmentById(R.id.fragment_container);
-                if (fragment != null) {
-                    fragment.fetchAndSyncTasksFromAsana();
+                androidx.fragment.app.Fragment current = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+                if (current instanceof com.example.freelancera.view.TaskListFragment) {
+                    ((com.example.freelancera.view.TaskListFragment) current).fetchAndSyncTasksFromAsana();
                 }
             }, 5000);
+            syncTogglData();
         }
     }
 
@@ -118,20 +128,26 @@ public class MainActivity extends AppCompatActivity {
                         .edit().putString("api_key", finalToken).apply();
 
                     // Weryfikacja API Key Toggl (tylko Toast i logi)
-                    okhttp3.OkHttpClient client = new okhttp3.OkHttpClient();
-                    okhttp3.Request request = new okhttp3.Request.Builder()
+                    OkHttpClient client = new OkHttpClient();
+                    String auth = okhttp3.Credentials.basic(finalToken, "api_token");
+                    Request meReq = new Request.Builder()
                         .url("https://api.track.toggl.com/api/v9/me")
-                        .addHeader("Authorization", okhttp3.Credentials.basic(finalToken, "api_token"))
+                        .addHeader("Authorization", auth)
                         .build();
-                    client.newCall(request).enqueue(new okhttp3.Callback() {
+                    client.newCall(meReq).enqueue(new okhttp3.Callback() {
                         @Override
-                        public void onFailure(okhttp3.Call call, java.io.IOException e) {
+                        public void onFailure(okhttp3.Call call, IOException e) {
                             Log.e(TAG, "Toggl API connection error: " + e.getMessage());
                             runOnUiThread(() -> Toast.makeText(MainActivity.this, "Błąd połączenia z Toggl: " + e.getMessage(), Toast.LENGTH_LONG).show());
                         }
                         @Override
-                        public void onResponse(okhttp3.Call call, okhttp3.Response response) throws java.io.IOException {
-                            String body = response.body() != null ? response.body().string() : "";
+                        public void onResponse(okhttp3.Call call, okhttp3.Response response) throws IOException {
+                            if (!response.isSuccessful()) {
+                                Log.e(TAG, "Toggl API connection error: " + response.message());
+                                runOnUiThread(() -> Toast.makeText(MainActivity.this, "Błąd połączenia z Toggl: " + response.message(), Toast.LENGTH_LONG).show());
+                                return;
+                            }
+                            String body = response.body().string();
                             String msg = "Toggl API response: " + response.code() + " " + body;
                             Log.d(TAG, msg);
                             runOnUiThread(() -> {
@@ -141,14 +157,14 @@ public class MainActivity extends AppCompatActivity {
                                 } else {
                                     Toast.makeText(MainActivity.this, "Niepoprawny API Key Toggl!", Toast.LENGTH_LONG).show();
                                 }
+                                // Odśwież profil, jeśli otwarty
+                                if (profileBottomSheet != null && profileBottomSheet.isShowing()) {
+                                    profileBottomSheet.dismiss();
+                                    showProfileBottomSheet();
+                                }
                             });
                         }
                     });
-                    // Odśwież profil, jeśli otwarty
-                    if (profileBottomSheet != null && profileBottomSheet.isShowing()) {
-                        profileBottomSheet.dismiss();
-                        showProfileBottomSheet();
-                    }
                 }
             }
         }
@@ -177,7 +193,7 @@ public class MainActivity extends AppCompatActivity {
         if (toolbar != null) {
             toolbar.setTitle("");
             setSupportActionBar(toolbar);
-
+            
             // Wyśrodkuj tytuł
             TextView toolbarTitle = toolbar.findViewById(R.id.toolbarTitle);
             if (toolbarTitle != null) {
@@ -209,14 +225,24 @@ public class MainActivity extends AppCompatActivity {
             bottomNavigationView.setOnItemSelectedListener(item -> {
                 int itemId = item.getItemId();
                 if (itemId == R.id.navigation_tasks) {
-                    // Sprawdź czy użytkownik ma połączone konto Asana
-                    checkAsanaConnection();
-                    return true;
-                } else if (itemId == R.id.navigation_invoices) {
-                    // Zakładka Faktury - pusta
+                    // Zawsze wstaw nowy TaskListFragment
                     getSupportFragmentManager()
                         .beginTransaction()
-                        .replace(R.id.fragment_container, new androidx.fragment.app.Fragment())
+                        .replace(R.id.fragment_container, new com.example.freelancera.view.TaskListFragment())
+                        .commit();
+                    // Odśwież zadania po krótkim opóźnieniu
+                    new android.os.Handler().postDelayed(() -> {
+                        androidx.fragment.app.Fragment current = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+                        if (current instanceof com.example.freelancera.view.TaskListFragment) {
+                            ((com.example.freelancera.view.TaskListFragment) current).fetchAndSyncTasksFromAsana();
+                        }
+                    }, 500);
+                    return true;
+                } else if (itemId == R.id.navigation_invoices) {
+                    // Zakładka Faktury - dedykowany fragment
+                    getSupportFragmentManager()
+                        .beginTransaction()
+                        .replace(R.id.fragment_container, new com.example.freelancera.view.InvoiceListFragment())
                         .commit();
                     return true;
                 } else if (itemId == R.id.navigation_history) {
@@ -252,7 +278,6 @@ public class MainActivity extends AppCompatActivity {
         // Inicjalizacja widoków
         ShapeableImageView profileImage = bottomSheetView.findViewById(R.id.profileImage);
         MaterialButton connectAsanaButton = bottomSheetView.findViewById(R.id.connectAsanaButton);
-        SwitchMaterial darkModeSwitch = bottomSheetView.findViewById(R.id.darkModeSwitch);
         MaterialButton changePasswordButton = bottomSheetView.findViewById(R.id.changePasswordButton);
         MaterialButton logoutButton = bottomSheetView.findViewById(R.id.logoutButton);
         MaterialButton connectTogglButton = bottomSheetView.findViewById(R.id.connectTogglButton);
@@ -268,20 +293,22 @@ public class MainActivity extends AppCompatActivity {
             firestore.collection("users").document(user.getUid())
                 .get()
                 .addOnSuccessListener(document -> {
-                    boolean isConnected = document.contains("asanaToken") &&
+                    boolean isConnected = document.contains("asanaToken") && 
                                         document.getBoolean("asanaConnected") == Boolean.TRUE;
                     updateAsanaConnectionUI(connectAsanaButton, isConnected);
                 })
                 .addOnFailureListener(e -> Toast.makeText(this,
-                    "Błąd podczas sprawdzania połączenia z Asana",
+                    "Błąd podczas sprawdzania połączenia z Asana", 
                     Toast.LENGTH_SHORT).show());
         }
 
         // Sprawdź status połączenia z Toggl
         boolean togglConnected = false;
-        String togglToken = null;
+        String togglToken;
         if (user != null) {
             togglToken = getSharedPreferences("toggl_prefs", MODE_PRIVATE).getString("api_key", null);
+        } else {
+            togglToken = null;
         }
         if (togglToken != null && !togglToken.isEmpty()) {
             togglConnected = true;
@@ -335,14 +362,6 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        // Obsługa przełącznika ciemnego motywu
-        darkModeSwitch.setChecked(AppCompatDelegate.getDefaultNightMode() == AppCompatDelegate.MODE_NIGHT_YES);
-        darkModeSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            AppCompatDelegate.setDefaultNightMode(
-                isChecked ? AppCompatDelegate.MODE_NIGHT_YES : AppCompatDelegate.MODE_NIGHT_NO
-            );
-        });
-
         // Obsługa zmiany hasła
         changePasswordButton.setOnClickListener(v -> {
             if (user != null && user.getEmail() != null) {
@@ -388,7 +407,7 @@ public class MainActivity extends AppCompatActivity {
                 Toast.makeText(this, "Rozłączono z Asana!", Toast.LENGTH_SHORT).show();
                 updateAsanaConnectionUI(button, false);
             })
-            .addOnFailureListener(e -> Toast.makeText(this,
+            .addOnFailureListener(e -> Toast.makeText(this, 
                 "Błąd podczas rozłączania z Asana: " + e.getMessage(), Toast.LENGTH_LONG).show());
         }
     }
@@ -419,7 +438,7 @@ public class MainActivity extends AppCompatActivity {
                         }
                         loadAsanaTasks();
                     })
-                    .addOnFailureListener(e -> Toast.makeText(this,
+                    .addOnFailureListener(e -> Toast.makeText(this, 
                         "Błąd zapisu tokena Asana: " + e.getMessage(), Toast.LENGTH_LONG).show());
                 }
             });
@@ -454,7 +473,7 @@ public class MainActivity extends AppCompatActivity {
                         @Override
                         public void onFailure(okhttp3.Call call, java.io.IOException e) {
                             Log.e(TAG, "Błąd pobierania workspaces: " + e.getMessage(), e);
-                            runOnUiThread(() -> Toast.makeText(MainActivity.this,
+                            runOnUiThread(() -> Toast.makeText(MainActivity.this, 
                                 "Błąd pobierania workspaces: " + e.getMessage(), Toast.LENGTH_LONG).show());
                         }
 
@@ -462,6 +481,7 @@ public class MainActivity extends AppCompatActivity {
                         public void onResponse(okhttp3.Call call, okhttp3.Response response) throws java.io.IOException {
                             if (response.isSuccessful()) {
                                 String responseBody = response.body().string();
+                                Log.d(TAG, "ASANA WORKSPACES: " + responseBody);
                                 try {
                                     org.json.JSONObject json = new org.json.JSONObject(responseBody);
                                     org.json.JSONArray workspaces = json.getJSONArray("data");
@@ -472,7 +492,7 @@ public class MainActivity extends AppCompatActivity {
                                             @Override
                                             public void onFailure(okhttp3.Call call, java.io.IOException e) {
                                                 Log.e(TAG, "Błąd pobierania projektów: " + e.getMessage(), e);
-                                                runOnUiThread(() -> Toast.makeText(MainActivity.this,
+                                                runOnUiThread(() -> Toast.makeText(MainActivity.this, 
                                                     "Błąd pobierania projektów: " + e.getMessage(), Toast.LENGTH_LONG).show());
                                             }
 
@@ -480,9 +500,20 @@ public class MainActivity extends AppCompatActivity {
                                             public void onResponse(okhttp3.Call call, okhttp3.Response response) throws java.io.IOException {
                                                 if (response.isSuccessful()) {
                                                     String projectsBody = response.body().string();
+                                                    Log.d(TAG, "ASANA PROJECTS: " + projectsBody);
                                                     try {
-                                                        org.json.JSONObject projectsJson = new org.json.JSONObject(projectsBody);
-                                                        org.json.JSONArray projects = projectsJson.getJSONArray("data");
+                                                        org.json.JSONArray projects;
+                                                        // Sprawdź czy odpowiedź to tablica czy obiekt
+                                                        if (projectsBody.trim().startsWith("[")) {
+                                                            projects = new org.json.JSONArray(projectsBody);
+                                                        } else if (projectsBody.trim().startsWith("{")) {
+                                                            org.json.JSONObject json = new org.json.JSONObject(projectsBody);
+                                                            projects = json.getJSONArray("data");
+                                                        } else {
+                                                            Log.e(TAG, "[TOGGL] Nieoczekiwany format odpowiedzi: " + projectsBody);
+                                                            return;
+                                                        }
+                                                        Log.d(TAG, "[TOGGL] Liczba projektów do zapisu: " + projects.length());
                                                         if (projects.length() > 0) {
                                                             String projectId = projects.getJSONObject(0).getString("gid");
                                                             // Pobierz zadania
@@ -490,14 +521,14 @@ public class MainActivity extends AppCompatActivity {
                                                                 @Override
                                                                 public void onFailure(okhttp3.Call call, java.io.IOException e) {
                                                                     Log.e(TAG, "Błąd pobierania zadań: " + e.getMessage(), e);
-                                                                    runOnUiThread(() -> Toast.makeText(MainActivity.this,
+                                                                    runOnUiThread(() -> Toast.makeText(MainActivity.this, 
                                                                         "Błąd pobierania zadań: " + e.getMessage(), Toast.LENGTH_LONG).show());
                                                                 }
 
                                                                 @Override
                                                                 public void onResponse(okhttp3.Call call, okhttp3.Response response) throws java.io.IOException {
                                                                     String responseBody = response.body().string();
-                                                                    Log.d(TAG, "Odpowiedź zadania: " + responseBody);
+                                                                    Log.d(TAG, "ASANA TASKS: " + responseBody);
                                                                     if (response.isSuccessful()) {
                                                                         try {
                                                                             org.json.JSONObject json = new org.json.JSONObject(responseBody);
@@ -568,127 +599,240 @@ public class MainActivity extends AppCompatActivity {
             });
     }
 
-    private void syncLocalChangesToAsana(String token, String projectId) {
-        if (user == null) return;
-
-        // Get all tasks that need syncing
-        firestore.collection("users")
-                .document(user.getUid())
-                .collection("tasks")
-                .whereEqualTo("needsSync", true)
-                .get()
-                .addOnSuccessListener(queryDocumentSnapshots -> {
-                    for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
-                        Task task = document.toObject(Task.class);
-
-                        if (task.getAsanaId() != null) {
-                            // Update existing task in Asana
-                            updateTaskInAsana(token, task);
-                        } else {
-                            // Create new task in Asana
-                            createTaskInAsana(token, projectId, task);
-                        }
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Błąd pobierania zadań do synchronizacji: " + e.getMessage());
-                });
-    }
-
-    private void updateTaskInAsana(String token, Task task) {
-        JSONObject taskData = new JSONObject();
-        try {
-            taskData.put("name", task.getName());
-            taskData.put("notes", task.getDescription());
-            taskData.put("completed", task.getStatus().equals("Ukończone"));
-
-            if (task.getDueDate() != null) {
-                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-                taskData.put("due_on", sdf.format(task.getDueDate()));
+    public void syncTogglData() {
+        Log.d(TAG, "syncTogglData: UID = " + (user != null ? user.getUid() : "user null"));
+        if (user == null) {
+            Log.e(TAG, "syncTogglData: user == null");
+            return;
+        }
+        if (firestore == null) {
+            Log.e(TAG, "syncTogglData: firestore == null");
+            return;
+        }
+        firestore.collection("users").document(user.getUid()).get().addOnSuccessListener(document -> {
+            String togglToken = document.getString("togglToken");
+            if (togglToken == null || togglToken.isEmpty()) {
+                Log.e(TAG, "syncTogglData: brak tokena");
+                return;
             }
-
-            com.example.freelancera.auth.AsanaApi.updateTask(token, task.getAsanaId(), taskData, new okhttp3.Callback() {
+            OkHttpClient client = new OkHttpClient();
+            String auth = okhttp3.Credentials.basic(togglToken, "api_token");
+            // 1. Pobierz workspaceId
+            Request meReq = new Request.Builder()
+                    .url("https://api.track.toggl.com/api/v9/me")
+                    .addHeader("Authorization", auth)
+                    .build();
+            client.newCall(meReq).enqueue(new okhttp3.Callback() {
                 @Override
-                public void onFailure(okhttp3.Call call, java.io.IOException e) {
-                    Log.e(TAG, "Błąd aktualizacji zadania w Asana: " + e.getMessage());
+                public void onFailure(okhttp3.Call call, IOException e) {
+                    Log.e(TAG, "[TOGGL] Błąd pobierania me: " + e.getMessage());
                 }
-
                 @Override
-                public void onResponse(okhttp3.Call call, okhttp3.Response response) throws java.io.IOException {
+                public void onResponse(okhttp3.Call call, okhttp3.Response response) throws IOException {
+                    if (!response.isSuccessful()) {
+                        Log.e(TAG, "[TOGGL] Błąd pobierania me: " + response.message());
+                        return;
+                    }
+                    String body = response.body().string();
+                    try {
+                        org.json.JSONObject me = new org.json.JSONObject(body);
+                        long workspaceId = me.getLong("default_workspace_id");
+                        // 2. Pobierz WSZYSTKIE projekty
+                        String projectsUrl = "https://api.track.toggl.com/api/v9/workspaces/" + workspaceId + "/projects";
+                        Request projectsReq = new Request.Builder()
+                                .url(projectsUrl)
+                                .addHeader("Authorization", auth)
+                                .build();
+                        client.newCall(projectsReq).enqueue(new okhttp3.Callback() {
+                            @Override
+                            public void onFailure(okhttp3.Call call, IOException e) {
+                                Log.e(TAG, "[TOGGL] Błąd pobierania projektów: " + e.getMessage());
+                            }
+                            @Override
+                            public void onResponse(okhttp3.Call call, okhttp3.Response response) throws IOException {
+                                if (!response.isSuccessful()) {
+                                    Log.e(TAG, "[TOGGL] Błąd pobierania projektów: " + response.message());
+                                    return;
+                                }
+                                String projectsBody = response.body().string();
+                                try {
+                                    org.json.JSONArray projects;
+                                    // Sprawdź czy odpowiedź to tablica czy obiekt
+                                    if (projectsBody.trim().startsWith("[")) {
+                                        projects = new org.json.JSONArray(projectsBody);
+                                    } else if (projectsBody.trim().startsWith("{")) {
+                                        org.json.JSONObject json = new org.json.JSONObject(projectsBody);
+                                        projects = json.getJSONArray("data");
+                                    } else {
+                                        Log.e(TAG, "[TOGGL] Nieoczekiwany format odpowiedzi: " + projectsBody);
+                                        return;
+                                    }
+                                    Log.d(TAG, "[TOGGL] Liczba projektów do zapisu: " + projects.length());
+                                    // Zbierz unikalne workspace_id
+                                    java.util.Set<String> workspaceIds = new java.util.HashSet<>();
+                                    for (int i = 0; i < projects.length(); i++) {
+                                        org.json.JSONObject project = projects.getJSONObject(i);
+                                        String workspaceIdStr = project.optString("workspace_id", null);
+                                        if (workspaceIdStr != null) workspaceIds.add(workspaceIdStr);
+                                    }
+                                    // Dla każdego workspace_id: pobierz klientów, usuń i zapisz projekty
+                                    for (String workspaceIdStr : workspaceIds) {
+                                        // Pobierz klientów dla workspace
+                                        String clientsUrl = "https://api.track.toggl.com/api/v9/workspaces/" + workspaceIdStr + "/clients";
+                                        Request clientsReq = new Request.Builder()
+                                                .url(clientsUrl)
+                                                .addHeader("Authorization", auth)
+                                                .build();
+                                        client.newCall(clientsReq).enqueue(new okhttp3.Callback() {
+                                            @Override
+                                            public void onFailure(okhttp3.Call call, IOException e) {
+                                                Log.e(TAG, "[TOGGL] Błąd pobierania klientów: " + e.getMessage());
+                                                // Kontynuuj bez klientów
+                                                saveProjectsForWorkspace(projects, workspaceIdStr, null);
+                                            }
+                                            @Override
+                                            public void onResponse(okhttp3.Call call, okhttp3.Response response) throws IOException {
+                                                org.json.JSONArray clients = null;
                     if (response.isSuccessful()) {
-                        // Mark task as synced
-                        task.setNeedsSync(false);
-                        task.setLastSyncDate(new Date());
-
-                        firestore.collection("users")
-                                .document(user.getUid())
-                                .collection("tasks")
-                                .document(task.getId())
-                                .set(task);
-
-                        Log.d(TAG, "Zadanie zaktualizowane w Asana: " + task.getName());
-                    } else {
-                        Log.e(TAG, "Błąd aktualizacji zadania w Asana: " + response.code());
+                                                    try {
+                                                        String clientsBody = response.body().string();
+                                                        clients = new org.json.JSONArray(clientsBody);
+                                                    } catch (Exception e) {
+                                                        Log.e(TAG, "[TOGGL] Błąd parsowania klientów: " + e.getMessage());
+                                                    }
+                                                }
+                                                saveProjectsForWorkspace(projects, workspaceIdStr, clients);
+                                            }
+                                        });
+                                    }
+                                } catch (Exception e) {
+                                    Log.e(TAG, "[TOGGL] Błąd parsowania projektów: " + e.getMessage(), e);
+                                }
+                            }
+                        });
+                        // 3. Pobierz WSZYSTKIE time entries (bez zmian)
+                        String timeEntriesUrl = "https://api.track.toggl.com/api/v9/me/time_entries";
+                        Request timeReq = new Request.Builder()
+                                .url(timeEntriesUrl)
+                                .addHeader("Authorization", auth)
+                                .build();
+                        client.newCall(timeReq).enqueue(new okhttp3.Callback() {
+                            @Override
+                            public void onFailure(okhttp3.Call call, IOException e) {
+                                Log.e(TAG, "[TOGGL] Błąd pobierania time_entries: " + e.getMessage());
+                            }
+                            @Override
+                            public void onResponse(okhttp3.Call call, okhttp3.Response response) throws IOException {
+                                if (!response.isSuccessful()) {
+                                    Log.e(TAG, "[TOGGL] Błąd pobierania time_entries: " + response.message());
+                                    return;
+                                }
+                                String timeBody = response.body().string();
+                                try {
+                                    org.json.JSONArray timeEntries = new org.json.JSONArray(timeBody);
+                                    for (int i = 0; i < timeEntries.length(); i++) {
+                                        org.json.JSONObject entry = timeEntries.getJSONObject(i);
+                                        String entryId = entry.optString("id", null);
+                                        String workspaceIdStr = entry.optString("workspace_id", null);
+                                        String docId = (workspaceIdStr != null ? workspaceIdStr + "_" : "") + (entryId != null ? entryId : "brak_id");
+                                        if (entryId != null) {
+                                            Map<String, Object> data = new java.util.HashMap<>();
+                                            java.util.Iterator<String> keys = entry.keys();
+                                            while (keys.hasNext()) {
+                                                String key = keys.next();
+                                                Object value = entry.opt(key);
+                                                if (value instanceof String || value instanceof Number || value instanceof Boolean || value instanceof Map || value instanceof java.util.List) {
+                                                    data.put(key, value);
+                                                } else if (value != null && (value instanceof org.json.JSONArray || value instanceof org.json.JSONObject)) {
+                                                    data.put(key, value.toString());
+                                                }
+                                            }
+                                            Log.d(TAG, "[TOGGL] Dane do zapisu (time_entry): " + data.toString());
+                                            firestore.collection("users").document(user.getUid())
+                                                    .collection("toggl_time_entries").document(docId)
+                                                    .set(data)
+                                                    .addOnSuccessListener(unused -> Log.d(TAG, "[TOGGL] Zapisano time_entry: " + docId))
+                                                    .addOnFailureListener(e -> Log.e(TAG, "[TOGGL] Błąd zapisu time_entry: " + e.getMessage(), e));
+                                        }
+                                    }
+                                } catch (Exception e) {
+                                    Log.e(TAG, "[TOGGL] Błąd parsowania time_entries: " + e.getMessage(), e);
+                                }
+                            }
+                        });
+                    } catch (Exception e) {
+                        Log.e(TAG, "[TOGGL] Błąd parsowania me: " + e.getMessage(), e);
                     }
                 }
             });
-        } catch (JSONException e) {
-            Log.e(TAG, "Błąd tworzenia JSON dla zadania: " + e.getMessage());
-        }
+        });
     }
 
-    private void createTaskInAsana(String token, String projectId, Task task) {
-        JSONObject taskData = new JSONObject();
-        try {
-            taskData.put("name", task.getName());
-            taskData.put("notes", task.getDescription());
-            taskData.put("projects", new JSONArray().put(projectId));
-            taskData.put("completed", task.getStatus().equals("Ukończone"));
-
-            if (task.getDueDate() != null) {
-                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-                taskData.put("due_on", sdf.format(task.getDueDate()));
-            }
-
-            com.example.freelancera.auth.AsanaApi.createTask(token, taskData, new okhttp3.Callback() {
-                @Override
-                public void onFailure(okhttp3.Call call, java.io.IOException e) {
-                    Log.e(TAG, "Błąd tworzenia zadania w Asana: " + e.getMessage());
-                }
-
-                @Override
-                public void onResponse(okhttp3.Call call, okhttp3.Response response) throws java.io.IOException {
-                    if (response.isSuccessful()) {
-                        String responseBody = response.body().string();
+    // Pomocnicza metoda do usuwania i zapisywania projektów dla workspace
+    private void saveProjectsForWorkspace(org.json.JSONArray projects, String workspaceIdStr, org.json.JSONArray clients) {
+        firestore.collection("users").document(user.getUid())
+                .collection("toggl_projects").document(workspaceIdStr)
+                .collection("projects").get()
+                .addOnSuccessListener(querySnapshot -> {
+                    int count = 0;
+                    for (com.google.firebase.firestore.DocumentSnapshot doc : querySnapshot.getDocuments()) {
+                        doc.getReference().delete();
+                        count++;
+                    }
+                    Log.d(TAG, "[TOGGL] Usunięto " + count + " stare projekty z workspace_id=" + workspaceIdStr);
+                    // Zapisz nowe projekty z tego workspace_id
+                    for (int i = 0; i < projects.length(); i++) {
                         try {
-                            JSONObject json = new JSONObject(responseBody);
-                            JSONObject data = json.getJSONObject("data");
-                            String asanaId = data.getString("gid");
-
-                            // Update task with Asana ID
-                            task.setAsanaId(asanaId);
-                            task.setNeedsSync(false);
-                            task.setLastSyncDate(new Date());
-                            task.setSource("asana");
-
-                            firestore.collection("users")
-                                    .document(user.getUid())
-                                    .collection("tasks")
-                                    .document(task.getId())
-                                    .set(task);
-
-                            Log.d(TAG, "Zadanie utworzone w Asana: " + task.getName());
-                        } catch (JSONException e) {
-                            Log.e(TAG, "Błąd parsowania odpowiedzi z Asana: " + e.getMessage());
-                        }
+                            org.json.JSONObject innerProject = projects.getJSONObject(i);
+                            String innerProjectId = innerProject.optString("id", null);
+                            String wsId = innerProject.optString("workspace_id", null);
+                            if (innerProjectId != null && wsId != null && wsId.equals(workspaceIdStr)) {
+                                Map<String, Object> data = new java.util.HashMap<>();
+                                java.util.Iterator<String> keys = innerProject.keys();
+                                while (keys.hasNext()) {
+                                    String key = keys.next();
+                                    Object value = innerProject.opt(key);
+                                    if (value instanceof String || value instanceof Number || value instanceof Boolean || value instanceof Map || value instanceof java.util.List) {
+                                        data.put(key, value);
+                                    } else if (value != null && (value instanceof org.json.JSONArray || value instanceof org.json.JSONObject)) {
+                                        data.put(key, value.toString());
+                }
+                                }
+                                // Jeśli nie ma client_name, spróbuj znaleźć po client_id
+                                if (!data.containsKey("client_name") && data.containsKey("client_id") && clients != null) {
+                                    String clientId = String.valueOf(data.get("client_id"));
+                                    for (int c = 0; c < clients.length(); c++) {
+                                        try {
+                                            org.json.JSONObject cl = clients.getJSONObject(c);
+                                            if (cl.optString("id").equals(clientId)) {
+                                                String cname = cl.optString("name", null);
+                                                if (cname != null) {
+                                                    data.put("client_name", cname);
+                                                    Log.d(TAG, "[TOGGL] Uzupełniono client_name: " + cname);
+                                                }
+                                                break;
+                                            }
+                                        } catch (Exception ignore) {}
+                                    }
+                                }
+                                if (data.containsKey("client_name")) {
+                                    Log.d(TAG, "[TOGGL] Zapis klienta: " + data.get("client_name"));
+                                }
+                                Log.d(TAG, "[TOGGL] Dane do zapisu (project): workspace_id=" + wsId + ", project_id=" + innerProjectId + ", data=" + data.toString());
+                                firestore.collection("users").document(user.getUid())
+                                        .collection("toggl_projects").document(wsId)
+                                        .collection("projects").document(innerProjectId)
+                                        .set(data)
+                                        .addOnSuccessListener(unused -> Log.d(TAG, "[TOGGL] Zapisano projekt: workspace_id=" + wsId + ", project_id=" + innerProjectId + " (" + data.getOrDefault("name", "brak nazwy") + ")"))
+                                        .addOnFailureListener(e -> Log.e(TAG, "[TOGGL] Błąd zapisu projektu: " + e.getMessage(), e));
                     } else {
-                        Log.e(TAG, "Błąd tworzenia zadania w Asana: " + response.code());
+                                Log.w(TAG, "[TOGGL] Pominięto projekt bez workspace_id lub id: " + innerProject.toString());
+                            }
+                        } catch (org.json.JSONException e) {
+                            Log.e(TAG, "[TOGGL] Błąd parsowania projektu: " + e.getMessage(), e);
                     }
                 }
             });
-        } catch (JSONException e) {
-            Log.e(TAG, "Błąd tworzenia JSON dla zadania: " + e.getMessage());
-        }
     }
 
     private void checkAsanaConnection() {
@@ -696,18 +840,18 @@ public class MainActivity extends AppCompatActivity {
             firestore.collection("users").document(user.getUid())
                 .get()
                 .addOnSuccessListener(document -> {
-                    boolean isConnected = document.contains("asanaToken") &&
+                    boolean isConnected = document.contains("asanaToken") && 
                                         document.getBoolean("asanaConnected") == Boolean.TRUE;
                     if (isConnected) {
                         loadAsanaTasks();
                     } else {
-                        Toast.makeText(this,
-                            "Połącz najpierw konto z Asana. Kliknij ikonę profilu w prawym górnym rogu.",
+                        Toast.makeText(this, 
+                            "Połącz najpierw konto z Asana. Kliknij ikonę profilu w prawym górnym rogu.", 
                             Toast.LENGTH_LONG).show();
                     }
                 })
                 .addOnFailureListener(e -> Toast.makeText(this,
-                    "Błąd podczas sprawdzania połączenia z Asana",
+                    "Błąd podczas sprawdzania połączenia z Asana", 
                     Toast.LENGTH_SHORT).show());
         }
     }

@@ -55,6 +55,10 @@ import com.google.android.material.textfield.TextInputEditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+/**
+ * TaskListFragment - fragment wyświetlający listę zadań użytkownika.
+ * Obsługuje synchronizację z Asana i Toggl, filtrowanie, sortowanie oraz UI listy zadań.
+ */
 public class TaskListFragment extends Fragment {
     private static final String TAG = "TaskListFragment";
 
@@ -77,8 +81,14 @@ public class TaskListFragment extends Fragment {
     private FirebaseFirestore firestore;
     private FirebaseUser user;
 
+    /**
+     * Konstruktor domyślny.
+     */
     public TaskListFragment() {}
 
+    /**
+     * Tworzy i inicjalizuje widok fragmentu.
+     */
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_task_list, container, false);
@@ -110,7 +120,12 @@ public class TaskListFragment extends Fragment {
         recyclerView.setAdapter(adapter);
 
         // Setup SwipeRefreshLayout
-        swipeRefreshLayout.setOnRefreshListener(this::fetchAndSyncTasksFromAsana);
+        swipeRefreshLayout.setOnRefreshListener(() -> {
+            fetchAndSyncTasksFromAsana();
+            if (getActivity() instanceof com.example.freelancera.MainActivity) {
+                ((com.example.freelancera.MainActivity) getActivity()).syncTogglData();
+            }
+        });
         swipeRefreshLayout.setColorSchemeResources(
             android.R.color.holo_blue_bright,
             android.R.color.holo_green_light,
@@ -158,6 +173,9 @@ public class TaskListFragment extends Fragment {
         return view;
     }
 
+    /**
+     * Synchronizuje zadania z Asana i Toggl.
+     */
     public void fetchAndSyncTasksFromAsana() {
         if (user == null) {
             Log.e(TAG, "fetchAndSyncTasksFromAsana: user is null");
@@ -171,9 +189,7 @@ public class TaskListFragment extends Fragment {
             swipeRefreshLayout.setRefreshing(false);
             return;
         }
-        
         Log.d(TAG, "fetchAndSyncTasksFromAsana: starting task sync");
-        
         firestore.collection("users").document(user.getUid())
             .get()
             .addOnSuccessListener(documentSnapshot -> {
@@ -182,6 +198,10 @@ public class TaskListFragment extends Fragment {
                     if (asanaToken != null) {
                         Log.d(TAG, "fetchAndSyncTasksFromAsana: found Asana token, fetching tasks");
                         fetchTasksFromAsanaAndSave(asanaToken, user.getUid());
+                        // --- DODAJ: Po zakończeniu synchronizacji z Asaną, odśwież Toggl ---
+                        if (getActivity() instanceof com.example.freelancera.MainActivity) {
+                            ((com.example.freelancera.MainActivity) getActivity()).syncTogglData();
+                        }
                     } else {
                         Log.e(TAG, "fetchAndSyncTasksFromAsana: no Asana token found");
                         swipeRefreshLayout.setRefreshing(false);
@@ -328,7 +348,7 @@ public class TaskListFragment extends Fragment {
                 try {
                     String gid = tasks.getJSONObject(i).getString("gid");
                     Request detailRequest = new Request.Builder()
-                            .url("https://app.asana.com/api/1.0/tasks/" + gid + "?opt_fields=gid,name,completed,due_on,created_at,projects,assignee")
+                            .url("https://app.asana.com/api/1.0/tasks/" + gid + "?opt_fields=gid,name,completed,due_on,created_at,projects,assignee,notes")
                             .addHeader("Authorization", "Bearer " + token)
                             .build();
                     client.newCall(detailRequest).enqueue(new Callback() {
@@ -408,6 +428,10 @@ public class TaskListFragment extends Fragment {
             Map<String, Object> taskMap = new HashMap<>();
             taskMap.put("id", task.getString("gid"));
             taskMap.put("name", task.getString("name"));
+            // Dodaj description
+            String description = task.optString("notes", "");
+            Log.d("ASANA_DESCRIPTION", "Zadanie: " + task.getString("name") + ", description: " + description);
+            taskMap.put("description", description);
             // Status: Ukończone jeśli completed, w przeciwnym razie data utworzenia lub "Nowe"
             String status;
             boolean completed = task.has("completed") && task.getBoolean("completed");
@@ -442,10 +466,21 @@ public class TaskListFragment extends Fragment {
             } else {
                 taskMap.put("dueDate", null);
             }
-            if (createdAt != null) {
-                taskMap.put("createdAt", createdAt);
+            if (task.has("completed_at") && !task.isNull("completed_at")) {
+                // Jeśli completed_at jest, spróbuj sparsować na Date
+                String completedAtStr = task.getString("completed_at");
+                try {
+                    java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.getDefault());
+                    java.util.Date completedAtDate = sdf.parse(completedAtStr);
+                    taskMap.put("completedAt", completedAtDate);
+                } catch (Exception e) {
+                    taskMap.put("completedAt", new java.util.Date()); // fallback: dziś
+                }
+            } else if (completed) {
+                // Jeśli zadanie ukończone, ale nie ma completed_at, zapisz dzisiejszą datę
+                taskMap.put("completedAt", new java.util.Date());
             } else {
-                taskMap.put("createdAt", null);
+                taskMap.put("completedAt", null);
             }
             taskCollection.document(task.getString("gid"))
                     .set(taskMap)
@@ -474,13 +509,11 @@ public class TaskListFragment extends Fragment {
 
     private void loadTasksFromFirestore(String uid) {
         Log.d(TAG, "loadTasksFromFirestore: loading tasks for user " + uid);
-        
         if (getContext() == null) {
             Log.e(TAG, "loadTasksFromFirestore: context is null");
-            swipeRefreshLayout.setRefreshing(false);
+            requireActivity().runOnUiThread(() -> swipeRefreshLayout.setRefreshing(false));
             return;
         }
-
         firestore.collection("users").document(uid)
                 .collection("tasks")
                 .get()
@@ -489,16 +522,233 @@ public class TaskListFragment extends Fragment {
                     for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
                         Task task = document.toObject(Task.class);
                         task.setId(document.getId());
+                        Log.d(TAG, "ASANA TASK: " + document.getData().toString());
                         allTasks.add(task);
                     }
-                    filterAndSortTasks();
-                    swipeRefreshLayout.setRefreshing(false);
+                    // --- LIVE MERGE Z TOGGL API ---
+                    firestore.collection("users").document(uid).get().addOnSuccessListener(userDoc -> {
+                        String togglToken = userDoc.getString("togglToken");
+                        if (togglToken == null || togglToken.isEmpty()) {
+                            requireActivity().runOnUiThread(() -> {
+                                filterAndSortTasks();
+                                swipeRefreshLayout.setRefreshing(false);
+                            });
+                            return;
+                        }
+                        OkHttpClient client = new OkHttpClient();
+                        String auth = okhttp3.Credentials.basic(togglToken, "api_token");
+                        // 1. Pobierz workspaceId
+                        Request meReq = new Request.Builder()
+                                .url("https://api.track.toggl.com/api/v9/me")
+                                .addHeader("Authorization", auth)
+                                .build();
+                        client.newCall(meReq).enqueue(new okhttp3.Callback() {
+                            @Override
+                            public void onFailure(okhttp3.Call call, IOException e) {
+                                Log.e(TAG, "[TOGGL] Błąd pobierania me: " + e.getMessage());
+                                requireActivity().runOnUiThread(() -> {
+                                    filterAndSortTasks();
+                                    swipeRefreshLayout.setRefreshing(false);
+                                });
+                            }
+                            @Override
+                            public void onResponse(okhttp3.Call call, okhttp3.Response response) throws IOException {
+                                if (!response.isSuccessful()) {
+                                    Log.e(TAG, "[TOGGL] Błąd pobierania me: " + response.message());
+                                    requireActivity().runOnUiThread(() -> {
+                                        filterAndSortTasks();
+                                        swipeRefreshLayout.setRefreshing(false);
+                                    });
+                                    return;
+                                }
+                                String body = response.body().string();
+                                try {
+                                    org.json.JSONObject me = new org.json.JSONObject(body);
+                                    long workspaceId = me.getLong("default_workspace_id");
+                                    // 2. Pobierz projekty
+                                    String projectsUrl = "https://api.track.toggl.com/api/v9/workspaces/" + workspaceId + "/projects";
+                                    Request projectsReq = new Request.Builder()
+                                            .url(projectsUrl)
+                                            .addHeader("Authorization", auth)
+                                            .build();
+                                    client.newCall(projectsReq).enqueue(new okhttp3.Callback() {
+                                        @Override
+                                        public void onFailure(okhttp3.Call call, IOException e) {
+                                            Log.e(TAG, "[TOGGL] Błąd pobierania projektów: " + e.getMessage());
+                                            requireActivity().runOnUiThread(() -> {
+                                                filterAndSortTasks();
+                                                swipeRefreshLayout.setRefreshing(false);
+                                            });
+                                        }
+                                        @Override
+                                        public void onResponse(okhttp3.Call call, okhttp3.Response response) throws IOException {
+                                            if (!response.isSuccessful()) {
+                                                Log.e(TAG, "[TOGGL] Błąd pobierania projektów: " + response.message());
+                                                requireActivity().runOnUiThread(() -> {
+                                                    filterAndSortTasks();
+                                                    swipeRefreshLayout.setRefreshing(false);
+                                                });
+                                                return;
+                                            }
+                                            String projectsBody = response.body().string();
+                                            try {
+                                                // Sprawdź czy odpowiedź to tablica czy obiekt
+                                                if (projectsBody.trim().startsWith("{")) {
+                                                    org.json.JSONObject json = new org.json.JSONObject(projectsBody);
+                                                    if (!json.has("data")) {
+                                                        Log.e(TAG, "[TOGGL] Brak pola 'data' w odpowiedzi: " + projectsBody);
+                                                        requireActivity().runOnUiThread(() -> {
+                                                            Toast.makeText(getContext(), "Błąd: Brak projektów lub nieprawidłowa odpowiedź API", Toast.LENGTH_LONG).show();
+                                                            filterAndSortTasks();
+                                                            swipeRefreshLayout.setRefreshing(false);
+                                                        });
+                                                        return;
+                                                    }
+                                                    org.json.JSONArray projects = json.getJSONArray("data");
+                                                    // 3. Pobierz klientów
+                                                    String clientsUrl = "https://api.track.toggl.com/api/v9/workspaces/" + workspaceId + "/clients";
+                                                    Request clientsReq = new Request.Builder()
+                                                            .url(clientsUrl)
+                                                            .addHeader("Authorization", auth)
+                                                            .build();
+                                                    client.newCall(clientsReq).enqueue(new okhttp3.Callback() {
+                                                        @Override
+                                                        public void onFailure(okhttp3.Call call, IOException e) {
+                                                            Log.e(TAG, "[TOGGL] Błąd pobierania klientów: " + e.getMessage());
+                                                            mergeAsanaWithTogglProjects(projects, null, uid);
+                                                        }
+                                                        @Override
+                                                        public void onResponse(okhttp3.Call call, okhttp3.Response response) throws IOException {
+                                                            org.json.JSONArray clients = null;
+                                                            if (response.isSuccessful()) {
+                                                                try {
+                                                                    String clientsBody = response.body().string();
+                                                                    clients = new org.json.JSONArray(clientsBody);
+                                                                } catch (Exception e) {
+                                                                    Log.e(TAG, "[TOGGL] Błąd parsowania klientów: " + e.getMessage());
+                                                                }
+                                                            }
+                                                            mergeAsanaWithTogglProjects(projects, clients, uid);
+                                                        }
+                                                    });
+                                                } else if (projectsBody.trim().startsWith("[")) {
+                                                    org.json.JSONArray projects = new org.json.JSONArray(projectsBody);
+                                                    // 3. Pobierz klientów
+                                                    String clientsUrl = "https://api.track.toggl.com/api/v9/workspaces/" + workspaceId + "/clients";
+                                                    Request clientsReq = new Request.Builder()
+                                                            .url(clientsUrl)
+                                                            .addHeader("Authorization", auth)
+                                                            .build();
+                                                    client.newCall(clientsReq).enqueue(new okhttp3.Callback() {
+                                                        @Override
+                                                        public void onFailure(okhttp3.Call call, IOException e) {
+                                                            Log.e(TAG, "[TOGGL] Błąd pobierania klientów: " + e.getMessage());
+                                                            mergeAsanaWithTogglProjects(projects, null, uid);
+                                                        }
+                                                        @Override
+                                                        public void onResponse(okhttp3.Call call, okhttp3.Response response) throws IOException {
+                                                            org.json.JSONArray clients = null;
+                                                            if (response.isSuccessful()) {
+                                                                try {
+                                                                    String clientsBody = response.body().string();
+                                                                    clients = new org.json.JSONArray(clientsBody);
+                                                                } catch (Exception e) {
+                                                                    Log.e(TAG, "[TOGGL] Błąd parsowania klientów: " + e.getMessage());
+                                                                }
+                                                            }
+                                                            mergeAsanaWithTogglProjects(projects, clients, uid);
+                                                        }
+                                                    });
+                                                } else {
+                                                    Log.e(TAG, "[TOGGL] Nieoczekiwany format odpowiedzi: " + projectsBody);
+                                                    requireActivity().runOnUiThread(() -> {
+                                                        Toast.makeText(getContext(), "Błąd: Nieoczekiwany format odpowiedzi z API", Toast.LENGTH_LONG).show();
+                                                        filterAndSortTasks();
+                                                        swipeRefreshLayout.setRefreshing(false);
+                                                    });
+                                                    return;
+                                                }
+                                            } catch (Exception e) {
+                                                Log.e(TAG, "Błąd parsowania projektów: " + e.getMessage() + " | Odpowiedź: " + projectsBody, e);
+                                                requireActivity().runOnUiThread(() -> {
+                                                    Toast.makeText(getContext(), "Błąd parsowania projektów: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                                                    filterAndSortTasks();
+                                                    swipeRefreshLayout.setRefreshing(false);
+                                                });
+                                            }
+                                        }
+                                    });
+                                } catch (Exception e) {
+                                    Log.e(TAG, "[TOGGL] Błąd parsowania me: " + e.getMessage(), e);
+                                    requireActivity().runOnUiThread(() -> {
+                                        filterAndSortTasks();
+                                        swipeRefreshLayout.setRefreshing(false);
+                                    });
+                                }
+                            }
+                        });
+                    });
+                    // --- KONIEC LIVE MERGE ---
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "loadTasksFromFirestore: error loading tasks", e);
-                    Toast.makeText(getContext(), "Błąd podczas ładowania zadań: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                    swipeRefreshLayout.setRefreshing(false);
+                    requireActivity().runOnUiThread(() -> {
+                        Toast.makeText(getContext(), "Błąd podczas ładowania zadań: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                        swipeRefreshLayout.setRefreshing(false);
+                    });
                 });
+    }
+
+    // Nowa metoda: merge Asana <-> Toggl (live z API)
+    private void mergeAsanaWithTogglProjects(org.json.JSONArray projects, org.json.JSONArray clients, String uid) {
+        try {
+            for (Task task : allTasks) {
+                for (int p = 0; p < projects.length(); p++) {
+                    org.json.JSONObject proj = projects.getJSONObject(p);
+                    String togglProjectName = proj.optString("name", null);
+                    if (togglProjectName != null && togglProjectName.equalsIgnoreCase(task.getName())) {
+                        // Uzupełnij klienta z projektu Toggl
+                        String togglClientName = null;
+                        String clientId = proj.optString("client_id", null);
+                        if ((proj.has("client_name") && !proj.isNull("client_name"))) {
+                            togglClientName = proj.optString("client_name");
+                        } else if (clientId != null && clients != null) {
+                            for (int c = 0; c < clients.length(); c++) {
+                                org.json.JSONObject cl = clients.getJSONObject(c);
+                                if (cl.optString("id").equals(clientId)) {
+                                    togglClientName = cl.optString("name", null);
+                                    break;
+                                }
+                            }
+                        }
+                        if (togglClientName != null && !togglClientName.isEmpty()) {
+                            task.setTogglClientName(togglClientName);
+                            task.setClient(togglClientName);
+                        }
+                        // Uzupełnij czas z actual_seconds (jeśli jest)
+                        long actualSeconds = proj.optLong("actual_seconds", 0);
+                        if (actualSeconds > 0) {
+                            task.setTogglTrackedSeconds(actualSeconds);
+                        }
+                        // Zapisz zaktualizowane zadanie do Firestore
+                        firestore.collection("users").document(uid)
+                                .collection("tasks").document(task.getId())
+                                .set(task)
+                                .addOnSuccessListener(unused -> Log.d(TAG, "Zaktualizowano zadanie z danymi Toggl (live API): " + task.getName()))
+                                .addOnFailureListener(e -> Log.e(TAG, "Błąd zapisu zadania z Toggl (live API): " + e.getMessage()));
+                        break; // tylko pierwszy pasujący projekt
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "mergeAsanaWithTogglProjects: " + e.getMessage(), e);
+        }
+        // ZABEZPIECZENIE przed wywołaniem na niepodpiętym fragmencie
+        if (!isAdded() || getActivity() == null) return;
+        requireActivity().runOnUiThread(() -> {
+            filterAndSortTasks();
+            swipeRefreshLayout.setRefreshing(false);
+        });
     }
 
     private void showFilteredTasks() {

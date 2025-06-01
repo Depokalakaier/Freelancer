@@ -39,6 +39,13 @@ public class Task implements Parcelable {
     private String invoiceNumber; // Numer faktury jeśli została wygenerowana
     private boolean isTimerRunning;
     private long lastStartTime;
+    // Pola dla Toggl
+    private String togglProjectId;
+    private String togglProjectName;
+    private String togglClientId;
+    private String togglClientName;
+    private long togglTrackedSeconds;
+    private Date completedAt;
 
     public Task() {
         // Required empty constructor for Firestore
@@ -311,6 +318,24 @@ public class Task implements Parcelable {
 
     public long getLastStartTime() { return lastStartTime; }
     public void setLastStartTime(long lastStartTime) { this.lastStartTime = lastStartTime; }
+
+    public String getTogglProjectId() { return togglProjectId; }
+    public void setTogglProjectId(String togglProjectId) { this.togglProjectId = togglProjectId; }
+
+    public String getTogglProjectName() { return togglProjectName; }
+    public void setTogglProjectName(String togglProjectName) { this.togglProjectName = togglProjectName; }
+
+    public String getTogglClientId() { return togglClientId; }
+    public void setTogglClientId(String togglClientId) { this.togglClientId = togglClientId; }
+
+    public String getTogglClientName() { return togglClientName; }
+    public void setTogglClientName(String togglClientName) { this.togglClientName = togglClientName; }
+
+    public long getTogglTrackedSeconds() { return togglTrackedSeconds; }
+    public void setTogglTrackedSeconds(long togglTrackedSeconds) { this.togglTrackedSeconds = togglTrackedSeconds; }
+
+    public Date getCompletedAt() { return completedAt; }
+    public void setCompletedAt(Date completedAt) { this.completedAt = completedAt; }
 
     private void markForSync() {
         if ("asana".equals(source)) {

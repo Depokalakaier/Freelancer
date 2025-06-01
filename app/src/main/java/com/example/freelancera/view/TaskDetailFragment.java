@@ -61,8 +61,13 @@ public class TaskDetailFragment extends Fragment {
     private TextView amountText;
     private MaterialButton startStopButton;
     private MaterialButton completeButton;
-    private TextInputEditText ratePerHourEdit;
     private MaterialButton saveButton;
+    private TextView togglProjectText;
+    private TextView togglClientText;
+    private TextView clientHintText;
+    private TextView timeHeaderText;
+    private TextView hoursText;
+    private TextView rateText;
 
     // Przechowuje ostatnio wygenerowaną fakturę
     private Invoice lastInvoice = null;
@@ -96,15 +101,73 @@ public class TaskDetailFragment extends Fragment {
         // Initialize views
         titleText = view.findViewById(R.id.text_task_title);
         descriptionText = view.findViewById(R.id.text_task_description);
-        statusText = view.findViewById(R.id.text_task_status);
         clientText = view.findViewById(R.id.text_task_client);
         dueDateText = view.findViewById(R.id.text_task_due_date);
         timeText = view.findViewById(R.id.text_task_time);
         amountText = view.findViewById(R.id.text_task_amount);
-        startStopButton = view.findViewById(R.id.button_start_stop);
-        completeButton = view.findViewById(R.id.button_complete);
-        ratePerHourEdit = view.findViewById(R.id.edit_rate_per_hour);
         saveButton = view.findViewById(R.id.button_save);
+        clientHintText = view.findViewById(R.id.text_task_client_hint);
+        timeHeaderText = view.findViewById(R.id.text_task_time_header);
+        hoursText = view.findViewById(R.id.text_task_hours);
+        rateText = view.findViewById(R.id.text_task_rate);
+
+        // Ukryj status, togglProjectText, togglClientText, startStopButton, completeButton
+        if (view.findViewById(R.id.text_task_status) != null) view.findViewById(R.id.text_task_status).setVisibility(View.GONE);
+        if (view.findViewById(R.id.text_task_toggl_project) != null) view.findViewById(R.id.text_task_toggl_project).setVisibility(View.GONE);
+        if (view.findViewById(R.id.text_task_toggl_client) != null) view.findViewById(R.id.text_task_toggl_client).setVisibility(View.GONE);
+        if (view.findViewById(R.id.button_start_stop) != null) view.findViewById(R.id.button_start_stop).setVisibility(View.GONE);
+        if (view.findViewById(R.id.button_complete) != null) view.findViewById(R.id.button_complete).setVisibility(View.GONE);
+
+        // Obsługa kliknięcia klienta
+        clientText.setOnClickListener(v -> {
+            if (task == null) return;
+            android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(getContext());
+            builder.setTitle("Dodaj klienta");
+            final android.widget.EditText input = new android.widget.EditText(getContext());
+            input.setText(task.getClient() != null && !task.getClient().equals("Brak klienta") ? task.getClient() : "");
+            builder.setView(input);
+            builder.setPositiveButton("Zapisz", (dialog, which) -> {
+                String value = input.getText().toString();
+                if (!value.isEmpty()) {
+                    clientText.setText("Klient: " + value);
+                    clientHintText.setVisibility(View.GONE);
+                    task.setClient(value);
+                    FirebaseFirestore.getInstance().collection("users").document(user.getUid()).collection("tasks").document(task.getId()).update("client", value);
+                }
+            });
+            builder.setNegativeButton("Anuluj", (dialog, which) -> dialog.cancel());
+            builder.show();
+        });
+
+        // Obsługa kliknięcia stawki
+        rateText.setOnClickListener(v -> {
+            if (task == null) return;
+            android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(getContext());
+            builder.setTitle("Podaj stawkę za godzinę (PLN)");
+            final android.widget.EditText input = new android.widget.EditText(getContext());
+            input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+            input.setText(String.valueOf(task.getRatePerHour()));
+            builder.setView(input);
+            builder.setPositiveButton("Zapisz", (dialog, which) -> {
+                String value = input.getText().toString().replace(",", ".");
+                try {
+                    double rate = Double.parseDouble(value);
+                    task.setRatePerHour(rate);
+                    FirebaseFirestore.getInstance().collection("users").document(user.getUid()).collection("tasks").document(task.getId()).update("ratePerHour", rate);
+                    updateUI();
+                } catch (Exception ignored) {}
+            });
+            builder.setNegativeButton("Anuluj", (dialog, which) -> dialog.cancel());
+            builder.show();
+        });
+
+        // Toolbar tylko w szczegółach zadania
+        androidx.appcompat.widget.Toolbar toolbar = view.findViewById(R.id.toolbar);
+        if (toolbar != null) {
+            toolbar.setTitle(task != null ? task.getName() : "");
+            toolbar.setNavigationIcon(R.drawable.ic_arrow_back);
+            toolbar.setNavigationOnClickListener(v -> requireActivity().onBackPressed());
+        }
 
         return view;
     }
@@ -112,27 +175,7 @@ public class TaskDetailFragment extends Fragment {
     @Override
     public void onViewCreated(View view, Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-
-        // Konfiguracja toolbara i przycisku powrotu
-        androidx.appcompat.widget.Toolbar toolbar = view.findViewById(R.id.toolbar);
-        if (toolbar != null) {
-            toolbar.setNavigationOnClickListener(v -> {
-                if (getActivity() != null) {
-                    getActivity().onBackPressed();
-                }
-            });
-        }
-
-        // Najpierw załaduj zadanie
         loadTask();
-
-        // Przypisz listenery do przycisków
-        if (startStopButton != null) {
-            startStopButton.setOnClickListener(v -> toggleTimer());
-        }
-        if (completeButton != null) {
-            completeButton.setOnClickListener(v -> completeTask());
-        }
         if (saveButton != null) {
             saveButton.setOnClickListener(v -> saveChanges());
         }
@@ -181,30 +224,44 @@ public class TaskDetailFragment extends Fragment {
 
     private void updateUI() {
         if (task == null || getContext() == null) return;
-
+        // Tytuł
         if (titleText != null) titleText.setText(task.getName());
-        if (descriptionText != null) descriptionText.setText(task.getDescription());
-        if (statusText != null) statusText.setText(task.getStatus());
-        if (clientText != null) clientText.setText(task.getClient());
-        if (ratePerHourEdit != null) {
-            // Formatuj stawkę z dwoma miejscami po przecinku i używaj przecinka jako separatora
-            String formattedRate = String.format(Locale.getDefault(), "%.2f", task.getRatePerHour())
-                    .replace(".", ",");
-            ratePerHourEdit.setText(formattedRate);
-        }
-        
-        if (dueDateText != null) {
-            if (task.getDueDate() != null) {
-                SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy", Locale.getDefault());
-                dueDateText.setText(sdf.format(task.getDueDate()));
-                dueDateText.setVisibility(View.VISIBLE);
+        // Opis
+        if (descriptionText != null) {
+            String desc = task.getDescription();
+            if (desc == null || desc.trim().isEmpty()) {
+                descriptionText.setText("Brak opisu\n\n\n");
             } else {
-                dueDateText.setVisibility(View.GONE);
+                descriptionText.setText(desc);
             }
         }
-
-        updateTimeAndAmount();
-        updateButtons();
+        // Klient
+        if (clientText != null && clientHintText != null) {
+            if (task.getClient() == null || task.getClient().isEmpty() || task.getClient().equals("Brak klienta")) {
+                clientText.setText("Klient: Brak");
+                clientHintText.setVisibility(View.VISIBLE);
+            } else {
+                clientText.setText("Klient: " + task.getClient());
+                clientHintText.setVisibility(View.GONE);
+            }
+        }
+        // Termin
+        if (dueDateText != null && task.getDueDate() != null) {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd.MM.yyyy", java.util.Locale.getDefault());
+            dueDateText.setText("Termin: " + sdf.format(task.getDueDate()));
+        }
+        // Godziny i stawka
+        if (hoursText != null && rateText != null) {
+            long sec = task.getTogglTrackedSeconds();
+            int hours = (int) (sec / 3600);
+            int minutes = (int) ((sec % 3600) / 60);
+            double rounded = hours;
+            if (minutes >= 16 && minutes <= 44) rounded += 0.5;
+            else if (minutes >= 45) rounded += 1.0;
+            else if (minutes > 0) rounded += 1.0;
+            hoursText.setText("Przepracowane godziny " + String.format(java.util.Locale.getDefault(), "%.1f", rounded));
+            rateText.setText("Stawka " + String.format(java.util.Locale.getDefault(), "%.2f", task.getRatePerHour()) + "/h PLN");
+        }
     }
 
     private void updateTimeAndAmount() {
@@ -497,43 +554,19 @@ public class TaskDetailFragment extends Fragment {
 
     private void saveChanges() {
         if (task == null || user == null) return;
-
-        // Pobierz i zapisz stawkę godzinową
-        String rateText = ratePerHourEdit.getText().toString()
-                .replace(",", ".") // Zamień przecinek na kropkę
-                .trim(); // Usuń białe znaki
-                
-        if (!rateText.isEmpty()) {
-            try {
-                double rate = Double.parseDouble(rateText);
-                if (rate < 0) {
-                    Toast.makeText(getContext(), "Stawka nie może być ujemna", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                
-                // Aktualizuj model
-                task.setRatePerHour(rate);
-                
-                // Aktualizuj całe zadanie w Firestore
-                firestore.collection("users")
-                        .document(user.getUid())
-                        .collection("tasks")
-                        .document(task.getId())
-                        .set(task)  // Zapisz całe zadanie zamiast tylko jednego pola
-                        .addOnSuccessListener(aVoid -> {
-                            Toast.makeText(getContext(), "Zapisano zmiany", Toast.LENGTH_SHORT).show();
-                            updateTimeAndAmount(); // Przelicz kwotę z nową stawką
-                        })
-                        .addOnFailureListener(e -> {
-                            Toast.makeText(getContext(), "Błąd zapisu: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                            // Przywróć poprzednią wartość
-                            task.setRatePerHour(0.0);
-                            updateTimeAndAmount();
-                        });
-            } catch (NumberFormatException e) {
-                Toast.makeText(getContext(), "Nieprawidłowy format stawki. Użyj formatu: 50.00 lub 50,00", Toast.LENGTH_LONG).show();
-            }
-        }
+        // Zapisz aktualny stan task do Firestore
+        firestore.collection("users")
+                .document(user.getUid())
+                .collection("tasks")
+                .document(task.getId())
+                .set(task)
+                .addOnSuccessListener(aVoid -> {
+                    Toast.makeText(getContext(), "Zapisano zmiany", Toast.LENGTH_SHORT).show();
+                    updateTimeAndAmount();
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(getContext(), "Błąd zapisu: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
     }
 
     @Override

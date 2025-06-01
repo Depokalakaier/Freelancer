@@ -1,6 +1,9 @@
 package com.example.freelancera.adapter;
 
 import android.content.res.Configuration;
+import android.text.SpannableString;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.RelativeSizeSpan;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -62,6 +65,8 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
         private final TextView dueDateText;
         private final TextView timeText;
         private final TextView amountText;
+        private final TextView togglProjectText;
+        private final TextView togglClientText;
 
         TaskViewHolder(View itemView) {
             super(itemView);
@@ -72,36 +77,113 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
             dueDateText = itemView.findViewById(R.id.text_task_due_date);
             timeText = itemView.findViewById(R.id.text_task_time);
             amountText = itemView.findViewById(R.id.text_task_amount);
+            togglProjectText = itemView.findViewById(R.id.text_task_toggl_project);
+            togglClientText = itemView.findViewById(R.id.text_task_toggl_client);
         }
 
         void bind(Task task, OnTaskClickListener listener) {
             titleText.setText(task.getName());
             String status = task.getStatus();
             
-            statusText.setText(status);
-            clientText.setText(task.getClient());
-            
-            if (task.getDueDate() != null) {
-                SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy", Locale.getDefault());
-                java.util.Date today = new java.util.Date();
-                java.util.Date due = task.getDueDate();
-                long diff = (today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24);
-                if (due.before(today)) {
-                    dueDateText.setText("" + Math.abs(diff) + " dni po terminie");
-                    dueDateText.setTextColor(ContextCompat.getColor(itemView.getContext(), android.R.color.holo_red_dark));
+            if ("Ukończone".equals(status)) {
+                if (task.getCompletedAt() != null) {
+                    java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd.MM.yyyy", java.util.Locale.getDefault());
+                    statusText.setText("Ukończono " + sdf.format(task.getCompletedAt()));
                 } else {
-                    dueDateText.setText("Do: " + sdf.format(due));
-                    dueDateText.setTextColor(ContextCompat.getColor(itemView.getContext(), android.R.color.secondary_text_dark_nodisable));
+                    statusText.setText("Ukończono");
                 }
-                dueDateText.setVisibility(View.VISIBLE);
+                if (task.getDueDate() != null) {
+                    java.util.Calendar calDue = java.util.Calendar.getInstance();
+                    calDue.setTime(task.getDueDate());
+                    java.util.Calendar calCompleted = java.util.Calendar.getInstance();
+                    if (task.getCompletedAt() != null) {
+                        calCompleted.setTime(task.getCompletedAt());
+                    } else {
+                        calCompleted = java.util.Calendar.getInstance();
+                    }
+                    boolean isDueToday = calDue.get(java.util.Calendar.YEAR) == calCompleted.get(java.util.Calendar.YEAR)
+                            && calDue.get(java.util.Calendar.DAY_OF_YEAR) == calCompleted.get(java.util.Calendar.DAY_OF_YEAR);
+                    dueDateText.setVisibility(View.VISIBLE);
+                    dueDateText.setText("");
+                    if (isDueToday) {
+                        SpannableString span = new SpannableString("Termin do dzisiaj");
+                        span.setSpan(new ForegroundColorSpan(ContextCompat.getColor(itemView.getContext(), R.color.gray)), 0, span.length(), 0);
+                        span.setSpan(new RelativeSizeSpan(0.95f), 0, span.length(), 0);
+                        dueDateText.setText(span);
+                    } else {
+                        long diffDays = (calCompleted.getTimeInMillis() - calDue.getTimeInMillis()) / (1000 * 60 * 60 * 24);
+                        if (diffDays > 0) {
+                            String info = diffDays == 1 ? "1 dzień po terminie" : diffDays + " dni po terminie";
+                            SpannableString span = new SpannableString(info);
+                            span.setSpan(new ForegroundColorSpan(ContextCompat.getColor(itemView.getContext(), R.color.gray)), 0, info.length(), 0);
+                            span.setSpan(new RelativeSizeSpan(0.95f), 0, info.length(), 0);
+                            dueDateText.setText(span);
+                        } else {
+                            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd.MM.yyyy", java.util.Locale.getDefault());
+                            dueDateText.setText("Termin: " + sdf.format(task.getDueDate()));
+                        }
+                    }
+                } else {
+                    dueDateText.setVisibility(View.GONE);
+                }
+                clientText.setVisibility(View.VISIBLE);
+                clientText.setText(task.getClient());
             } else {
-                dueDateText.setVisibility(View.GONE);
+                statusText.setText(task.getStatus());
+                if (task.getDueDate() != null) {
+                    java.util.Calendar calDue = java.util.Calendar.getInstance();
+                    calDue.setTime(task.getDueDate());
+                    java.util.Calendar calToday = java.util.Calendar.getInstance();
+                    boolean isDueToday = calDue.get(java.util.Calendar.YEAR) == calToday.get(java.util.Calendar.YEAR)
+                            && calDue.get(java.util.Calendar.DAY_OF_YEAR) == calToday.get(java.util.Calendar.DAY_OF_YEAR);
+                    if (isDueToday) {
+                        SpannableString span = new SpannableString("Termin do dzisiaj");
+                        span.setSpan(new ForegroundColorSpan(ContextCompat.getColor(itemView.getContext(), R.color.red)), 0, span.length(), 0);
+                        span.setSpan(new RelativeSizeSpan(0.95f), 0, span.length(), 0);
+                        dueDateText.setText(span);
+                    } else {
+                        long diffDays = (calToday.getTimeInMillis() - calDue.getTimeInMillis()) / (1000 * 60 * 60 * 24);
+                        if (diffDays > 0) {
+                            String info = diffDays == 1 ? "1 dzień po terminie" : diffDays + " dni po terminie";
+                            SpannableString span = new SpannableString(info);
+                            span.setSpan(new ForegroundColorSpan(ContextCompat.getColor(itemView.getContext(), R.color.red)), 0, info.length(), 0);
+                            span.setSpan(new RelativeSizeSpan(0.95f), 0, info.length(), 0);
+                            dueDateText.setText(span);
+                        } else {
+                            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd.MM.yyyy", java.util.Locale.getDefault());
+                            dueDateText.setText("Termin: " + sdf.format(task.getDueDate()));
+                        }
+                    }
+                }
+                clientText.setVisibility(View.VISIBLE);
+                clientText.setText(task.getClient());
             }
 
-            // Format time
-            long hours = task.getTotalTimeInSeconds() / 3600;
-            long minutes = (task.getTotalTimeInSeconds() % 3600) / 60;
-            timeText.setText(String.format(Locale.getDefault(), "%02d:%02d", hours, minutes));
+            // Projekt z Toggl pod statusem
+            if (task.getTogglProjectName() != null && !task.getTogglProjectName().isEmpty()) {
+                togglProjectText.setText("Projekt: " + task.getTogglProjectName());
+                togglProjectText.setVisibility(View.VISIBLE);
+            } else {
+                togglProjectText.setVisibility(View.GONE);
+            }
+            // Klient z Toggl nad klientem
+            if (task.getTogglClientName() != null && !task.getTogglClientName().isEmpty() && (task.getClient() == null || !task.getClient().equals(task.getTogglClientName()))) {
+                togglClientText.setText("Klient: " + task.getTogglClientName());
+                togglClientText.setVisibility(View.VISIBLE);
+            } else {
+                togglClientText.setVisibility(View.GONE);
+            }
+            // Czas z Toggl jeśli jest
+            long togglSec = task.getTogglTrackedSeconds();
+            if (togglSec > 0) {
+                long hours = togglSec / 3600;
+                long minutes = (togglSec % 3600) / 60;
+                timeText.setText(String.format(Locale.getDefault(), "%02d:%02d", hours, minutes));
+            } else {
+                long hours = task.getTotalTimeInSeconds() / 3600;
+                long minutes = (task.getTotalTimeInSeconds() % 3600) / 60;
+                timeText.setText(String.format(Locale.getDefault(), "%02d:%02d", hours, minutes));
+            }
 
             // Format amount
             double amount = (task.getTotalTimeInSeconds() / 3600.0) * task.getRatePerHour();
@@ -134,7 +216,9 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
             }
 
             // Set click listener
-            itemView.setOnClickListener(v -> listener.onTaskClick(task));
+            itemView.setOnClickListener(v -> {
+                if (listener != null) listener.onTaskClick(task);
+            });
         }
     }
 }

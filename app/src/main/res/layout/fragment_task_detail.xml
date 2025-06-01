@@ -15,7 +15,8 @@
             android:layout_height="?attr/actionBarSize"
             android:background="?attr/colorPrimary"
             app:navigationIcon="@drawable/ic_arrow_back"
-            app:title="Szczegóły zadania"/>
+            app:title=""
+            />
 
     </com.google.android.material.appbar.AppBarLayout>
 
@@ -47,37 +48,72 @@
                         android:id="@+id/text_task_title"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:textSize="20sp"
+                        android:textSize="24sp"
                         android:textStyle="bold"
-                        android:layout_marginBottom="8dp"/>
+                        android:gravity="start"
+                        android:layout_marginBottom="4dp"/>
 
                     <TextView
                         android:id="@+id/text_task_description"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:textSize="14sp"
-                        android:layout_marginBottom="16dp"/>
+                        android:layout_marginBottom="12dp"
+                        android:lines="3"
+                        android:ellipsize="end"
+                        android:gravity="start"/>
 
                     <TextView
                         android:id="@+id/text_task_status"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:textSize="14sp"
-                        android:layout_marginBottom="4dp"/>
+                        android:layout_marginBottom="2dp"/>
+
+                    <TextView
+                        android:id="@+id/text_task_toggl_project"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="13sp"
+                        android:textColor="#888"
+                        android:layout_marginBottom="2dp"
+                        android:visibility="gone"/>
+
+                    <TextView
+                        android:id="@+id/text_task_toggl_client"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="13sp"
+                        android:textColor="#888"
+                        android:layout_marginBottom="2dp"
+                        android:visibility="gone"/>
 
                     <TextView
                         android:id="@+id/text_task_client"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:textSize="14sp"
-                        android:layout_marginBottom="4dp"/>
+                        android:layout_marginBottom="4dp"
+                        android:textColor="#888888"/>
+
+                    <TextView
+                        android:id="@+id/text_task_client_hint"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Kliknij by dodać"
+                        android:textSize="12sp"
+                        android:textColor="#BBBBBB"
+                        android:layout_marginStart="8dp"
+                        android:layout_marginBottom="4dp"
+                        android:visibility="gone"/>
 
                     <TextView
                         android:id="@+id/text_task_due_date"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:textSize="14sp"
-                        android:layout_marginBottom="16dp"/>
+                        android:layout_marginBottom="16dp"
+                        android:textColor="#888888"/>
 
                 </LinearLayout>
 
@@ -97,27 +133,49 @@
                     android:padding="16dp">
 
                     <TextView
-                        android:layout_width="match_parent"
+                        android:id="@+id/text_task_time_header"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Czas pracy i wynagrodzenie"
                         android:textStyle="bold"
                         android:textSize="16sp"
+                        android:gravity="start"
                         android:layout_marginBottom="8dp"/>
 
-                    <com.google.android.material.textfield.TextInputLayout
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="16dp"
-                        android:hint="Stawka godzinowa (PLN)"
-                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                        android:orientation="horizontal"
+                        android:gravity="start"
+                        android:layout_marginBottom="4dp">
 
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/edit_rate_per_hour"
-                            android:layout_width="match_parent"
+                        <TextView
+                            android:id="@+id/text_task_hours"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:inputType="numberDecimal"/>
+                            android:text="Przepracowane godziny 00:00"
+                            android:textSize="14sp"
+                            android:textColor="#222"/>
 
-                    </com.google.android.material.textfield.TextInputLayout>
+                        <TextView
+                            android:id="@+id/text_task_rate"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Stawka 00/h PLN"
+                            android:textSize="14sp"
+                            android:textColor="#888"
+                            android:layout_marginStart="16dp"/>
+
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/text_hint_add_rate"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="kliknij by dodać stawkę"
+                        android:textSize="10sp"
+                        android:textColor="#BBBBBB"
+                        android:layout_marginBottom="8dp"/>
 
                     <TextView
                         android:id="@+id/text_task_time"
@@ -158,16 +216,20 @@
 
                     </LinearLayout>
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/button_save"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="Zapisz zmiany"
-                        android:layout_marginTop="8dp"/>
-
                 </LinearLayout>
 
             </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/button_save"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Zapisz zmiany"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="24dp"
+                android:layout_gravity="bottom"
+                style="@style/Widget.MaterialComponents.Button"
+                />
 
         </LinearLayout>
 
