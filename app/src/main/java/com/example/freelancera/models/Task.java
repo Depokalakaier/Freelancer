@@ -10,6 +10,13 @@ import java.text.SimpleDateFormat;
 import java.text.ParseException;
 import java.util.Date;
 import java.util.Locale;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.FirebaseFirestore;
+import java.util.List;
+import java.util.ArrayList;
+import android.content.Context;
+import com.example.freelancera.storage.TaskStorage;
+import com.google.firebase.auth.FirebaseUser;
 
 public class Task implements Parcelable {
     private static final String TAG = "Task";
@@ -46,6 +53,8 @@ public class Task implements Parcelable {
     private String togglClientName;
     private long togglTrackedSeconds;
     private Date completedAt;
+    // Dodaję pole context (jeśli nie ma)
+    private transient android.content.Context context;
 
     public Task() {
         // Required empty constructor for Firestore
@@ -127,37 +136,32 @@ public class Task implements Parcelable {
 
     public static Task fromAsanaJson(JSONObject json) {
         try {
-            String gid = json.getString("gid");
-            String name = json.getString("name");
-            String status = json.getBoolean("completed") ? "Ukończone" : "Nowe";
+            Task task = new Task();
+            task.setId(json.getString("gid"));
+            task.setName(json.getString("name"));
+            task.setDescription(json.optString("notes", ""));
+            task.setStatus(json.optBoolean("completed") ? "Ukończone" : "Nowe");
             
-            Task task = new Task(gid, name, status);
-            task.setId(gid);
-            task.setAsanaId(gid);
-            task.source = "asana";
-            task.needsSync = false;
-            task.lastSyncDate = new Date();
-            
-            // Set description if available
-            if (json.has("notes") && !json.isNull("notes")) {
-                task.setDescription(json.getString("notes"));
+            // Zachowaj istniejącą stawkę jeśli zadanie już istnieje
+            Task existingTask = null;
+            if (task.context != null) {
+                TaskStorage storage = new TaskStorage(task.context);
+                existingTask = storage.getTask(task.getId());
             }
             
-            // Set due date if available
-            if (json.has("due_on") && !json.isNull("due_on")) {
-                try {
-                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-                    task.setDueDate(sdf.parse(json.getString("due_on")));
-                } catch (ParseException e) {
-                    Log.e(TAG, "Error parsing due date from Asana", e);
-                }
+            if (existingTask != null) {
+                task.setRatePerHour(existingTask.getRatePerHour());
+                task.setClient(existingTask.getClient());
+                task.setTogglProjectId(existingTask.getTogglProjectId());
+                task.setTogglProjectName(existingTask.getTogglProjectName());
+                task.setTogglClientId(existingTask.getTogglClientId());
+                task.setTogglClientName(existingTask.getTogglClientName());
+                task.setTogglTrackedSeconds(existingTask.getTogglTrackedSeconds());
             }
-            if (task.getId() == null) {
-                Log.e(TAG, "fromAsanaJson: id (gid) is null! JSON: " + json.toString());
-            }
+            
             return task;
-        } catch (JSONException e) {
-            Log.e(TAG, "Error parsing Asana task JSON", e);
+        } catch (Exception e) {
+            e.printStackTrace();
             return null;
         }
     }
@@ -229,16 +233,55 @@ public class Task implements Parcelable {
     }
 
     public double getRatePerHour() { 
-        // Jeśli stawka jest ujemna lub nie została ustawiona, zwróć 0
-        return ratePerHour < 0 ? 0.0 : ratePerHour; 
+        // Jeśli mamy ustawioną stawkę dla tego zadania, użyj jej
+        if (ratePerHour > 0) return ratePerHour;
+        
+        // Jeśli nie ma stawki, spróbuj pobrać z Firestore
+        if (context != null) {
+            FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+            if (user != null) {
+                FirebaseFirestore.getInstance()
+                    .collection("users")
+                    .document(user.getUid())
+                    .collection("tasks")
+                    .document(getId())
+                    .get()
+                    .addOnSuccessListener(documentSnapshot -> {
+                        if (documentSnapshot.exists()) {
+                            Double rate = documentSnapshot.getDouble("ratePerHour");
+                            if (rate != null && rate > 0) {
+                                ratePerHour = rate;
+                                // Zapisz lokalnie
+                                TaskStorage storage = new TaskStorage(context);
+                                storage.saveTask(this);
+                            }
+                        }
+                    });
+            }
+        }
+        
+        return ratePerHour;
     }
-    
+
     public void setRatePerHour(double ratePerHour) { 
-        // Nie pozwól na ujemną stawkę
-        this.ratePerHour = Math.max(0.0, ratePerHour);
+        this.ratePerHour = ratePerHour;
+        if (context != null) {
+            // Zapisz do Firestore
+            FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+            if (user != null) {
+                FirebaseFirestore.getInstance()
+                    .collection("users")
+                    .document(user.getUid())
+                    .collection("tasks")
+                    .document(getId())
+                    .update("ratePerHour", ratePerHour);
+                
+                // Zapisz lokalnie
+                TaskStorage storage = new TaskStorage(context);
+                storage.saveTask(this);
+            }
+        }
         markForSync();
-        // Przelicz całkowitą kwotę
-        calculateTotalAmount();
     }
 
     public Date getDueDate() { return dueDate; }
@@ -337,6 +380,8 @@ public class Task implements Parcelable {
     public Date getCompletedAt() { return completedAt; }
     public void setCompletedAt(Date completedAt) { this.completedAt = completedAt; }
 
+    public void setContext(android.content.Context context) { this.context = context; }
+
     private void markForSync() {
         if ("asana".equals(source)) {
             this.needsSync = true;
@@ -348,8 +393,10 @@ public class Task implements Parcelable {
     }
 
     private void calculateTotalAmount() {
-        double hours = totalTimeInSeconds / 3600.0;
+        if (togglTrackedSeconds > 0 && ratePerHour > 0) {
+            double hours = togglTrackedSeconds / 3600.0;
         this.totalAmount = hours * ratePerHour;
+        }
     }
 
     public String getFormattedTotalTime() {
@@ -360,5 +407,92 @@ public class Task implements Parcelable {
 
     public String getFormattedAmount() {
         return String.format(Locale.getDefault(), "%.2f %s", totalAmount, currency);
+    }
+
+    public void updateTogglData(Context context, long trackedSeconds, String projectName, String clientName) {
+        this.togglTrackedSeconds = trackedSeconds;
+        this.togglProjectName = projectName;
+        this.togglClientName = clientName;
+        
+        if (context != null) {
+            TaskStorage storage = new TaskStorage(context);
+            storage.saveTask(this);
+        }
+    }
+
+    public static List<Task> loadTasks(Context context) {
+        if (context == null) return new ArrayList<>();
+        TaskStorage storage = new TaskStorage(context);
+        return storage.getAllTasks();
+    }
+
+    public void save(Context context) {
+        if (context == null) return;
+        TaskStorage storage = new TaskStorage(context);
+        storage.saveTask(this);
+    }
+
+    public double getRoundedHours() {
+        long seconds = togglTrackedSeconds > 0 ? togglTrackedSeconds : totalTimeInSeconds;
+        double exactHours = seconds / 3600.0;
+        
+        // Wydziel pełne godziny i minuty
+        int fullHours = (int) exactHours;
+        int minutes = (int) ((exactHours - fullHours) * 60);
+        
+        // Zaokrąglij według schematu
+        if (minutes <= 15) {
+            return fullHours;
+        } else if (minutes <= 44) {
+            return fullHours + 0.5;
+        } else {
+            return fullHours + 1;
+        }
+    }
+
+    public String getFormattedRoundedHours() {
+        double roundedHours = getRoundedHours();
+        int hours = (int) roundedHours;
+        int minutes = (int) ((roundedHours - hours) * 60);
+        return String.format(Locale.getDefault(), "%d:%02d", hours, minutes);
+    }
+
+    public void updateRateFromFirestore(Runnable onComplete) {
+        if (context == null || id == null) {
+            if (onComplete != null) onComplete.run();
+            return;
+        }
+
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user == null) {
+            if (onComplete != null) onComplete.run();
+            return;
+        }
+
+        FirebaseFirestore.getInstance()
+            .collection("users")
+            .document(user.getUid())
+            .collection("tasks")
+            .document(id)
+            .get()
+            .addOnSuccessListener(documentSnapshot -> {
+                if (documentSnapshot.exists()) {
+                    Double rate = documentSnapshot.getDouble("ratePerHour");
+                    if (rate != null && rate > 0) {
+                        ratePerHour = rate;
+                        // Zapisz lokalnie
+                        TaskStorage storage = new TaskStorage(context);
+                        storage.saveTask(this);
+                    }
+                }
+                if (onComplete != null) {
+                    onComplete.run();
+                }
+            })
+            .addOnFailureListener(e -> {
+                if (onComplete != null) {
+                    onComplete.run();
+                }
+            });
     }
 } 

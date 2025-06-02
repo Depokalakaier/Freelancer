@@ -17,6 +17,7 @@ import com.google.android.material.card.MaterialCardView;
 import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder> {
     
@@ -52,8 +53,20 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
     }
 
     public void updateTasks(List<Task> newTasks) {
-        this.tasks = newTasks;
-        notifyDataSetChanged();
+        tasks.clear();
+        tasks.addAll(newTasks);
+        
+        // Odśwież stawki dla wszystkich zadań
+        AtomicInteger completedUpdates = new AtomicInteger(0);
+        int totalTasks = tasks.size();
+
+        for (Task task : tasks) {
+            task.updateRateFromFirestore(() -> {
+                if (completedUpdates.incrementAndGet() == totalTasks) {
+                    notifyDataSetChanged();
+                }
+            });
+        }
     }
 
     static class TaskViewHolder extends RecyclerView.ViewHolder {
@@ -136,6 +149,7 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
                     java.util.Calendar calToday = java.util.Calendar.getInstance();
                     boolean isDueToday = calDue.get(java.util.Calendar.YEAR) == calToday.get(java.util.Calendar.YEAR)
                             && calDue.get(java.util.Calendar.DAY_OF_YEAR) == calToday.get(java.util.Calendar.DAY_OF_YEAR);
+                    dueDateText.setVisibility(View.VISIBLE);
                     if (isDueToday) {
                         SpannableString span = new SpannableString("Termin do dzisiaj");
                         span.setSpan(new ForegroundColorSpan(ContextCompat.getColor(itemView.getContext(), R.color.red)), 0, span.length(), 0);
@@ -154,6 +168,8 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
                             dueDateText.setText("Termin: " + sdf.format(task.getDueDate()));
                         }
                     }
+                } else {
+                    dueDateText.setVisibility(View.GONE);
                 }
                 clientText.setVisibility(View.VISIBLE);
                 clientText.setText(task.getClient());
@@ -173,21 +189,12 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
             } else {
                 togglClientText.setVisibility(View.GONE);
             }
-            // Czas z Toggl jeśli jest
-            long togglSec = task.getTogglTrackedSeconds();
-            if (togglSec > 0) {
-                long hours = togglSec / 3600;
-                long minutes = (togglSec % 3600) / 60;
-                timeText.setText(String.format(Locale.getDefault(), "%02d:%02d", hours, minutes));
-            } else {
-                long hours = task.getTotalTimeInSeconds() / 3600;
-                long minutes = (task.getTotalTimeInSeconds() % 3600) / 60;
-                timeText.setText(String.format(Locale.getDefault(), "%02d:%02d", hours, minutes));
-            }
 
-            // Format amount
-            double amount = (task.getTotalTimeInSeconds() / 3600.0) * task.getRatePerHour();
-            amountText.setText(String.format(Locale.getDefault(), "%.2f PLN", amount));
+            // Użyj zaokrąglonych godzin
+            timeText.setText(task.getFormattedRoundedHours());
+
+            // Format amount - użyj aktualnej stawki z zadania
+            amountText.setText(String.format(Locale.getDefault(), "%.0f PLN/h", task.getRatePerHour()));
 
             // Set card color based on status
             int colorRes;

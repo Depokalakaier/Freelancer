@@ -358,7 +358,7 @@ public class MainActivity extends AppCompatActivity {
                         .setShowTitle(true)
                         .build();
                     customTabsIntent.launchUrl(this, android.net.Uri.parse(togglConnectUrl));
-                });
+        });
             }
         }
 
@@ -614,7 +614,7 @@ public class MainActivity extends AppCompatActivity {
             if (togglToken == null || togglToken.isEmpty()) {
                 Log.e(TAG, "syncTogglData: brak tokena");
                 return;
-            }
+    }
             OkHttpClient client = new OkHttpClient();
             String auth = okhttp3.Credentials.basic(togglToken, "api_token");
             // 1. Pobierz workspaceId

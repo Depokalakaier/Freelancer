@@ -42,4 +42,9 @@ public class SettingsManager {
         settings.setInvoiceTool(prefs.getString("invoiceTool", "InvoiceNinja"));
         return settings;
     }
+
+    public static String getAsanaToken(Context context) {
+        android.content.SharedPreferences prefs = context.getSharedPreferences("user_settings", android.content.Context.MODE_PRIVATE);
+        return prefs.getString("asanaToken", null);
+    }
 }

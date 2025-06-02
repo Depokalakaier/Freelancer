@@ -6,7 +6,7 @@ import android.util.Log;
 
 import com.example.freelancera.model.Invoice;
 import com.example.freelancera.model.SyncHistory;
-import com.example.freelancera.model.Task;
+import com.example.freelancera.models.Task;
 import com.example.freelancera.model.WorkTime;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;

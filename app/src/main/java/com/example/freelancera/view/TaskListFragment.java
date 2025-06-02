@@ -54,6 +54,7 @@ import android.util.Log;
 import com.google.android.material.textfield.TextInputEditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import com.example.freelancera.storage.TaskStorage;
 
 /**
  * TaskListFragment - fragment wyświetlający listę zadań użytkownika.
@@ -81,6 +82,8 @@ public class TaskListFragment extends Fragment {
     private FirebaseFirestore firestore;
     private FirebaseUser user;
 
+    private TaskStorage taskStorage;
+
     /**
      * Konstruktor domyślny.
      */
@@ -106,18 +109,7 @@ public class TaskListFragment extends Fragment {
         btnToggleFilters = view.findViewById(R.id.btn_toggle_filters);
 
         // Setup RecyclerView
-        adapter = new TaskAdapter(new ArrayList<>(), task -> {
-            if (getActivity() instanceof MainActivity) {
-                // Otwórz szczegóły zadania w TaskDetailFragment
-                getActivity().getSupportFragmentManager()
-                    .beginTransaction()
-                    .replace(R.id.fragment_container, TaskDetailFragment.newInstance(task.getId()))
-                    .addToBackStack(null)
-                    .commit();
-            }
-        });
-        recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
-        recyclerView.setAdapter(adapter);
+        setupRecyclerView();
 
         // Setup SwipeRefreshLayout
         swipeRefreshLayout.setOnRefreshListener(() -> {
@@ -136,8 +128,10 @@ public class TaskListFragment extends Fragment {
         // Setup filters
         setupFilters();
 
-        // Initial data load - only load local tasks
-        loadTasksFromFirestore(user.getUid());
+        // Ładuj zadania z lokalnego storage
+        allTasks.clear();
+        allTasks.addAll(Task.loadTasks(getContext()));
+        filterAndSortTasks();
 
         // Obsługa wyszukiwania
         if (searchEditText != null) {
@@ -171,6 +165,56 @@ public class TaskListFragment extends Fragment {
         }
 
         return view;
+    }
+
+    @Override
+    public void onViewCreated(View view, Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        taskStorage = new TaskStorage(requireContext());
+        
+        // Automatyczne odświeżanie przy starcie
+        swipeRefreshLayout.setRefreshing(true);
+        fetchAndSyncTasksFromAsana();
+        if (getActivity() instanceof com.example.freelancera.MainActivity) {
+            ((com.example.freelancera.MainActivity) getActivity()).syncTogglData();
+        }
+    }
+
+    private void loadTasks() {
+        if (user == null) {
+            Toast.makeText(getContext(), "Nie jesteś zalogowany", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        FirebaseFirestore.getInstance()
+            .collection("users")
+            .document(user.getUid())
+            .collection("tasks")
+            .get()
+            .addOnSuccessListener(queryDocumentSnapshots -> {
+                allTasks.clear();
+                for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
+                    Task task = document.toObject(Task.class);
+                    task.setId(document.getId());
+                    task.setContext(getContext());
+                    allTasks.add(task);
+                    taskStorage.saveTask(task);
+                    if ("Ukończone".equals(task.getStatus()) && !task.isHasInvoice()) {
+                        handleCompletedTask(task);
+                    }
+                }
+                adapter.updateTasks(allTasks);
+                swipeRefreshLayout.setRefreshing(false);
+            })
+            .addOnFailureListener(e -> {
+                Toast.makeText(getContext(), "Błąd podczas ładowania zadań: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                swipeRefreshLayout.setRefreshing(false);
+                
+                // Load from local storage on failure
+                allTasks.clear();
+                allTasks.addAll(Task.loadTasks(getContext()));
+                adapter.updateTasks(allTasks);
+            });
     }
 
     /**
@@ -221,6 +265,12 @@ public class TaskListFragment extends Fragment {
                 Toast.makeText(getContext(), "Błąd przy pobieraniu tokenu: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 loadTasksFromFirestore(user.getUid());
             });
+
+        // Po zakończeniu synchronizacji, nadpisz całą lokalną bazę zadań
+        taskStorage.clearAllTasks();
+        for (Task task : allTasks) {
+            taskStorage.saveTask(task);
+        }
     }
 
     private void fetchTasksFromAsanaAndSave(String token, String uid) {
@@ -509,26 +559,31 @@ public class TaskListFragment extends Fragment {
 
     private void loadTasksFromFirestore(String uid) {
         Log.d(TAG, "loadTasksFromFirestore: loading tasks for user " + uid);
-        if (getContext() == null) {
-            Log.e(TAG, "loadTasksFromFirestore: context is null");
-            requireActivity().runOnUiThread(() -> swipeRefreshLayout.setRefreshing(false));
+        if (!isAdded() || getContext() == null) {
+            Log.e(TAG, "loadTasksFromFirestore: fragment not attached");
             return;
         }
         firestore.collection("users").document(uid)
                 .collection("tasks")
                 .get()
                 .addOnSuccessListener(queryDocumentSnapshots -> {
+                    if (!isAdded() || getContext() == null) return;
                     allTasks.clear();
                     for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
                         Task task = document.toObject(Task.class);
                         task.setId(document.getId());
-                        Log.d(TAG, "ASANA TASK: " + document.getData().toString());
+                        task.setContext(getContext());
                         allTasks.add(task);
+                        taskStorage.saveTask(task);
+                        if ("Ukończone".equals(task.getStatus()) && !task.isHasInvoice()) {
+                            handleCompletedTask(task);
+                        }
                     }
-                    // --- LIVE MERGE Z TOGGL API ---
                     firestore.collection("users").document(uid).get().addOnSuccessListener(userDoc -> {
+                        if (!isAdded() || getContext() == null) return;
                         String togglToken = userDoc.getString("togglToken");
                         if (togglToken == null || togglToken.isEmpty()) {
+                            if (!isAdded() || getContext() == null) return;
                             requireActivity().runOnUiThread(() -> {
                                 filterAndSortTasks();
                                 swipeRefreshLayout.setRefreshing(false);
@@ -537,7 +592,6 @@ public class TaskListFragment extends Fragment {
                         }
                         OkHttpClient client = new OkHttpClient();
                         String auth = okhttp3.Credentials.basic(togglToken, "api_token");
-                        // 1. Pobierz workspaceId
                         Request meReq = new Request.Builder()
                                 .url("https://api.track.toggl.com/api/v9/me")
                                 .addHeader("Authorization", auth)
@@ -545,7 +599,7 @@ public class TaskListFragment extends Fragment {
                         client.newCall(meReq).enqueue(new okhttp3.Callback() {
                             @Override
                             public void onFailure(okhttp3.Call call, IOException e) {
-                                Log.e(TAG, "[TOGGL] Błąd pobierania me: " + e.getMessage());
+                                if (!isAdded() || getContext() == null) return;
                                 requireActivity().runOnUiThread(() -> {
                                     filterAndSortTasks();
                                     swipeRefreshLayout.setRefreshing(false);
@@ -553,8 +607,8 @@ public class TaskListFragment extends Fragment {
                             }
                             @Override
                             public void onResponse(okhttp3.Call call, okhttp3.Response response) throws IOException {
+                                if (!isAdded() || getContext() == null) return;
                                 if (!response.isSuccessful()) {
-                                    Log.e(TAG, "[TOGGL] Błąd pobierania me: " + response.message());
                                     requireActivity().runOnUiThread(() -> {
                                         filterAndSortTasks();
                                         swipeRefreshLayout.setRefreshing(false);
@@ -565,7 +619,6 @@ public class TaskListFragment extends Fragment {
                                 try {
                                     org.json.JSONObject me = new org.json.JSONObject(body);
                                     long workspaceId = me.getLong("default_workspace_id");
-                                    // 2. Pobierz projekty
                                     String projectsUrl = "https://api.track.toggl.com/api/v9/workspaces/" + workspaceId + "/projects";
                                     Request projectsReq = new Request.Builder()
                                             .url(projectsUrl)
@@ -574,7 +627,7 @@ public class TaskListFragment extends Fragment {
                                     client.newCall(projectsReq).enqueue(new okhttp3.Callback() {
                                         @Override
                                         public void onFailure(okhttp3.Call call, IOException e) {
-                                            Log.e(TAG, "[TOGGL] Błąd pobierania projektów: " + e.getMessage());
+                                            if (!isAdded() || getContext() == null) return;
                                             requireActivity().runOnUiThread(() -> {
                                                 filterAndSortTasks();
                                                 swipeRefreshLayout.setRefreshing(false);
@@ -582,8 +635,8 @@ public class TaskListFragment extends Fragment {
                                         }
                                         @Override
                                         public void onResponse(okhttp3.Call call, okhttp3.Response response) throws IOException {
+                                            if (!isAdded() || getContext() == null) return;
                                             if (!response.isSuccessful()) {
-                                                Log.e(TAG, "[TOGGL] Błąd pobierania projektów: " + response.message());
                                                 requireActivity().runOnUiThread(() -> {
                                                     filterAndSortTasks();
                                                     swipeRefreshLayout.setRefreshing(false);
@@ -672,8 +725,8 @@ public class TaskListFragment extends Fragment {
                                                 Log.e(TAG, "Błąd parsowania projektów: " + e.getMessage() + " | Odpowiedź: " + projectsBody, e);
                                                 requireActivity().runOnUiThread(() -> {
                                                     Toast.makeText(getContext(), "Błąd parsowania projektów: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                                                    filterAndSortTasks();
-                                                    swipeRefreshLayout.setRefreshing(false);
+                    filterAndSortTasks();
+                    swipeRefreshLayout.setRefreshing(false);
                                                 });
                                             }
                                         }
@@ -687,14 +740,6 @@ public class TaskListFragment extends Fragment {
                                 }
                             }
                         });
-                    });
-                    // --- KONIEC LIVE MERGE ---
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "loadTasksFromFirestore: error loading tasks", e);
-                    requireActivity().runOnUiThread(() -> {
-                        Toast.makeText(getContext(), "Błąd podczas ładowania zadań: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                        swipeRefreshLayout.setRefreshing(false);
                     });
                 });
     }
@@ -734,7 +779,11 @@ public class TaskListFragment extends Fragment {
                         firestore.collection("users").document(uid)
                                 .collection("tasks").document(task.getId())
                                 .set(task)
-                                .addOnSuccessListener(unused -> Log.d(TAG, "Zaktualizowano zadanie z danymi Toggl (live API): " + task.getName()))
+                                .addOnSuccessListener(unused -> {
+                                    Log.d(TAG, "Zaktualizowano zadanie z danymi Toggl (live API): " + task.getName());
+                                    // Zapisz też lokalnie!
+                                    taskStorage.saveTask(task);
+                                })
                                 .addOnFailureListener(e -> Log.e(TAG, "Błąd zapisu zadania z Toggl (live API): " + e.getMessage()));
                         break; // tylko pierwszy pasujący projekt
                     }
@@ -747,8 +796,8 @@ public class TaskListFragment extends Fragment {
         if (!isAdded() || getActivity() == null) return;
         requireActivity().runOnUiThread(() -> {
             filterAndSortTasks();
-            swipeRefreshLayout.setRefreshing(false);
-        });
+                    swipeRefreshLayout.setRefreshing(false);
+                });
     }
 
     private void showFilteredTasks() {
@@ -765,40 +814,50 @@ public class TaskListFragment extends Fragment {
     }
 
     private void handleCompletedTask(Task task) {
+        // Ustaw context, by stawka była zawsze pobierana lokalnie
+        task.setContext(getContext());
         // Sprawdź czy mamy dane z Clockify
         if (!task.isHasClockifyTime()) {
             addSyncHistory(task, "CLOCKIFY_CHECK", "Nie masz autoryzacji z Clockify", false, 
                 "Połącz konto Clockify aby automatycznie pobierać czas pracy");
         }
+        // Generuj fakturę tylko jeśli nie istnieje
+        FirebaseFirestore.getInstance().collection("users").document(user.getUid())
+            .collection("invoices")
+            .whereEqualTo("taskId", task.getId())
+            .get()
+            .addOnSuccessListener(query -> {
+                if (query.isEmpty()) {
+                    createInvoiceForCompletedTask(task);
+                }
+            });
+    }
 
-        // Generuj fakturę
-        if (!task.isHasInvoice()) {
-            Invoice invoice = task.generateInvoice();
-            firestore.collection("users")
-                    .document(user.getUid())
-                    .collection("invoices")
-                    .add(invoice)
+    private void createInvoiceForCompletedTask(Task task) {
+        Invoice invoice = new Invoice(task.getId(), task.getClient(), task.getName(), task.getRatePerHour());
+        invoice.setHours(task.getTogglTrackedSeconds() / 3600.0); // Konwersja sekund na godziny
+        invoice.recalculateTotal();
+        
+        String uid = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        firestore.collection("users").document(uid)
+                .collection("invoices").add(invoice)
                     .addOnSuccessListener(documentReference -> {
-                        // Zaktualizuj task
+                    invoice.setId(documentReference.getId());
                         task.setHasInvoice(true);
-                        firestore.collection("users")
-                                .document(user.getUid())
-                                .collection("tasks")
-                                .document(task.getId())
-                                .update("hasInvoice", true);
-
-                        // Dodaj wpis do historii
-                        addSyncHistory(task, "INVOICE_CREATED", 
-                            "Wygenerowano fakturę roboczą", true, null);
-
-                        // Dodaj przypomnienie do kalendarza
-                        addCalendarReminder(task);
+                    task.setInvoiceNumber(documentReference.getId());
+                    
+                    // Aktualizuj zadanie w Firestore i lokalnie
+                    firestore.collection("users").document(uid)
+                            .collection("tasks").document(task.getId())
+                            .set(task)
+                            .addOnSuccessListener(aVoid -> {
+                                taskStorage.saveTask(task);
+                                Toast.makeText(getContext(), "Utworzono fakturę roboczą", Toast.LENGTH_SHORT).show();
+                            });
                     })
                     .addOnFailureListener(e -> {
-                        addSyncHistory(task, "INVOICE_CREATION_FAILED", 
-                            "Błąd generowania faktury", false, e.getMessage());
+                    Toast.makeText(getContext(), "Błąd tworzenia faktury: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                     });
-        }
     }
 
     private void addCalendarReminder(Task task) {
@@ -877,32 +936,78 @@ public class TaskListFragment extends Fragment {
     private void filterAndSortTasks() {
         List<Task> filteredTasks = new ArrayList<>(allTasks);
 
-        // Filtrowanie po statusie
-        if (!"all".equals(currentStatus)) {
-            filteredTasks.removeIf(task -> !currentStatus.equals(task.getStatus()) && !(currentStatus.equals("Termin") && task.getDueDate() != null));
+        // 1. Filtrowanie po statusie
+        if (!currentStatus.equals("all")) {
+            filteredTasks.removeIf(task -> !currentStatus.equals(task.getStatus()));
         }
 
-        // Filtrowanie po wyszukiwaniu
-        if (searchEditText != null && searchEditText.getText() != null) {
+        // 2. Filtrowanie po wyszukiwaniu
+        if (searchEditText != null && !searchEditText.getText().toString().isEmpty()) {
             String query = searchEditText.getText().toString().toLowerCase();
-            if (!query.isEmpty()) {
-                filteredTasks.removeIf(task -> task.getName() == null || !task.getName().toLowerCase().contains(query));
-            }
+            filteredTasks.removeIf(task -> 
+                task.getName() == null || !task.getName().toLowerCase().contains(query));
         }
 
-        // Sortowanie: Ukończone na dole, Nowe i W toku na górze
-        filteredTasks.sort((t1, t2) -> {
-            boolean t1Done = "Ukończone".equals(t1.getStatus());
-            boolean t2Done = "Ukończone".equals(t2.getStatus());
-            if (t1Done && !t2Done) return 1;
-            if (!t1Done && t2Done) return -1;
-            // Pozostałe sortuj po dacie utworzenia malejąco
-            if (t1.getCreatedAt() == null && t2.getCreatedAt() == null) return 0;
-            if (t1.getCreatedAt() == null) return 1;
-            if (t2.getCreatedAt() == null) return -1;
-            return t2.getCreatedAt().compareTo(t1.getCreatedAt());
+        // 3. Sortowanie:
+        Collections.sort(filteredTasks, (task1, task2) -> {
+            // Ukończone zadania zawsze na końcu
+            if (task1.getStatus().equals("Ukończone") && !task2.getStatus().equals("Ukończone")) {
+                return 1;
+            }
+            if (!task1.getStatus().equals("Ukończone") && task2.getStatus().equals("Ukończone")) {
+                return -1;
+            }
+            
+            // Sortowanie po terminie (jeśli oba zadania mają termin)
+            if (task1.getDueDate() != null && task2.getDueDate() != null) {
+                return task1.getDueDate().compareTo(task2.getDueDate());
+            }
+            
+            // Zadania z terminem przed zadaniami bez terminu
+            if (task1.getDueDate() != null && task2.getDueDate() == null) {
+                return -1;
+            }
+            if (task1.getDueDate() == null && task2.getDueDate() != null) {
+                return 1;
+            }
+            
+            // Jeśli brak terminów, sortuj po dacie utworzenia (nowsze pierwsze)
+            if (task1.getCreatedAt() != null && task2.getCreatedAt() != null) {
+                return task2.getCreatedAt().compareTo(task1.getCreatedAt());
+            }
+            
+            return 0;
         });
 
+        // 4. Aktualizacja adaptera na głównym wątku
+        if (getActivity() != null) {
+            getActivity().runOnUiThread(() -> {
         adapter.updateTasks(filteredTasks);
+                swipeRefreshLayout.setRefreshing(false);
+            });
+        }
+    }
+
+    private void onTaskClick(Task task) {
+        requireActivity().getSupportFragmentManager()
+                .beginTransaction()
+                .replace(R.id.fragment_container, TaskDetailsFragment.newInstance(task.getId()))
+                .addToBackStack(null)
+                .commit();
+    }
+
+    private void setupRecyclerView() {
+        adapter = new TaskAdapter(new ArrayList<>(), task -> {
+            if (getActivity() instanceof MainActivity) {
+                // Save task locally before opening details
+                taskStorage.saveTask(task);
+                
+                // Show task details as bottom sheet
+                TaskDetailsFragment bottomSheet = TaskDetailsFragment.newInstance(task.getId());
+                bottomSheet.show(getChildFragmentManager(), bottomSheet.getTag());
+            }
+        });
+        recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
+        recyclerView.setAdapter(adapter);
     }
 }

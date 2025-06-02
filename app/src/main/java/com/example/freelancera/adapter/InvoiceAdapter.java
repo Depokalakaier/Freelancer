@@ -8,7 +8,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import com.example.freelancera.R;
-import com.example.freelancera.model.Invoice;
+import com.example.freelancera.models.Invoice;
 import java.util.List;
 
 public class InvoiceAdapter extends RecyclerView.Adapter<InvoiceAdapter.InvoiceViewHolder> {
@@ -34,11 +34,12 @@ public class InvoiceAdapter extends RecyclerView.Adapter<InvoiceAdapter.InvoiceV
     @Override
     public void onBindViewHolder(@NonNull InvoiceViewHolder holder, int position) {
         Invoice invoice = invoiceList.get(position);
-        holder.client.setText(invoice.getClient());
+        holder.client.setText(invoice.getClientName());
         holder.amount.setText(invoice.getTotalAmount() + " zł");
-        holder.hours.setText(invoice.getHoursWorked() + "h");
-        holder.dueDate.setText("Termin: " + invoice.getDueDate());
-        holder.status.setText(invoice.isSent() ? "Wysłana" : "Robocza");
+        holder.hours.setText(invoice.getHours() + "h");
+        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd.MM.yyyy");
+        holder.dueDate.setText("Termin: " + (invoice.getDueDate() != null ? sdf.format(invoice.getDueDate()) : "brak"));
+        holder.status.setText(invoice.getStatus());
 
         if (invoice.isPaid()) {
             holder.paidStatus.setText("Opłacona");

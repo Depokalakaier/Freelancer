@@ -85,4 +85,36 @@ public class AsanaApi {
             Log.e(TAG, "Błąd aktualizacji zadania: " + e.getMessage());
         }
     }
+
+    public interface DeletionCallback {
+        void onSuccess();
+        void onFailure(String error);
+    }
+
+    public static void deleteTask(android.content.Context context, String taskId, DeletionCallback callback) {
+        String token = com.example.freelancera.util.SettingsManager.getAsanaToken(context);
+        if (token == null) {
+            callback.onFailure("Brak tokena Asana");
+            return;
+        }
+        Request request = new Request.Builder()
+            .url(BASE_URL + "/tasks/" + taskId)
+            .addHeader("Authorization", "Bearer " + token)
+            .delete()
+            .build();
+        client.newCall(request).enqueue(new okhttp3.Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                callback.onFailure(e.getMessage());
+            }
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                if (response.isSuccessful()) {
+                    callback.onSuccess();
+                } else {
+                    callback.onFailure("HTTP " + response.code());
+                }
+            }
+        });
+    }
 }

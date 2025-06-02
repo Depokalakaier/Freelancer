@@ -122,6 +122,10 @@ public class TogglApi {
                     asanaTask.setTogglClientId(togglTask.getTogglClientId());
                     asanaTask.setTogglClientName(togglTask.getTogglClientName());
                     asanaTask.setTogglTrackedSeconds(togglTask.getTogglTrackedSeconds());
+                    // NIE nadpisuj stawki jeśli już jest ustawiona
+                    if (asanaTask.getRatePerHour() <= 0 && togglTask.getRatePerHour() > 0) {
+                        asanaTask.setRatePerHour(togglTask.getRatePerHour());
+                    }
                     // Zapisz do Firestore
                     firestore.collection("users").document(user.getUid())
                             .collection("tasks").document(asanaTask.getId())

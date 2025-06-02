@@ -1,7 +1,7 @@
 package com.example.freelancera.controller;
 
 import android.content.Context;
-import com.example.freelancera.model.Task;
+import com.example.freelancera.models.Task;
 import com.example.freelancera.model.WorkTime;
 import com.example.freelancera.model.Invoice;
 import com.example.freelancera.model.SyncHistory;
@@ -44,13 +44,13 @@ public class SyncController {
         CalendarUtils.addEventToCalendar(
                 context,
                 "Wyślij fakturę do " + task.getClient(),
-                "Zadanie: " + task.getTitle(),
+                "Zadanie: " + task.getName(),
                 cal.getTimeInMillis()
         );
 
         // 4. Dodaj wpis do historii synchronizacji
         SyncHistory history = new SyncHistory(
-                task.getTitle() + " – faktura utworzona, przypomnienie dodane",
+                task.getName() + " – faktura utworzona, przypomnienie dodane",
                 new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date()),
                 "ok"
         );

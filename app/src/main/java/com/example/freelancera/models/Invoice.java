@@ -18,6 +18,10 @@ public class Invoice implements Parcelable {
     private Date dueDate;
     private boolean isPaid;
     private String status; // "DRAFT", "SENT", "PAID"
+    private boolean isLocalOnly = true;
+    private boolean reminderSet;
+    private Date reminderDate;
+    private String reminderNote;
 
     public Invoice() {
         // Required empty constructor for Firestore
@@ -31,9 +35,12 @@ public class Invoice implements Parcelable {
         this.hours = 0.0; // Domyślnie 0 - będzie aktualizowane z Clockify
         this.totalAmount = 0.0; // Będzie przeliczane po otrzymaniu godzin
         this.issueDate = new Date();
-        this.dueDate = new Date(System.currentTimeMillis() + 7 * 24 * 60 * 60 * 1000); // +7 dni
+        this.dueDate = new Date(System.currentTimeMillis() + 14 * 24 * 60 * 60 * 1000); // +14 dni
         this.isPaid = false;
         this.status = "DRAFT";
+        this.reminderSet = false;
+        this.reminderDate = null;
+        this.reminderNote = "";
     }
 
     protected Invoice(Parcel in) {
@@ -48,6 +55,11 @@ public class Invoice implements Parcelable {
         dueDate = new Date(in.readLong());
         isPaid = in.readByte() != 0;
         status = in.readString();
+        isLocalOnly = in.readByte() != 0;
+        reminderSet = in.readByte() != 0;
+        long reminderDateLong = in.readLong();
+        reminderDate = reminderDateLong != -1 ? new Date(reminderDateLong) : null;
+        reminderNote = in.readString();
     }
 
     @Override
@@ -63,6 +75,10 @@ public class Invoice implements Parcelable {
         dest.writeLong(dueDate.getTime());
         dest.writeByte((byte) (isPaid ? 1 : 0));
         dest.writeString(status);
+        dest.writeByte((byte) (isLocalOnly ? 1 : 0));
+        dest.writeByte((byte) (reminderSet ? 1 : 0));
+        dest.writeLong(reminderDate != null ? reminderDate.getTime() : -1);
+        dest.writeString(reminderNote);
     }
 
     public static final Creator<Invoice> CREATOR = new Creator<Invoice>() {
@@ -108,6 +124,7 @@ public class Invoice implements Parcelable {
     }
     
     public double getTotalAmount() { return totalAmount; }
+    public void setTotalAmount(double totalAmount) { this.totalAmount = totalAmount; }
     
     public Date getIssueDate() { return issueDate; }
     public void setIssueDate(Date issueDate) { this.issueDate = issueDate; }
@@ -124,7 +141,95 @@ public class Invoice implements Parcelable {
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
 
-    private void recalculateTotal() {
+    public boolean isLocalOnly() { return isLocalOnly; }
+    public void setLocalOnly(boolean localOnly) { this.isLocalOnly = localOnly; }
+
+    public boolean isReminderSet() {
+        return reminderSet;
+    }
+
+    public void setReminderSet(boolean reminderSet) {
+        this.reminderSet = reminderSet;
+    }
+
+    public Date getReminderDate() {
+        return reminderDate;
+    }
+
+    public void setReminderDate(Date reminderDate) {
+        this.reminderDate = reminderDate;
+        this.reminderSet = (reminderDate != null);
+    }
+
+    public String getReminderNote() {
+        return reminderNote;
+    }
+
+    public void setReminderNote(String reminderNote) {
+        this.reminderNote = reminderNote;
+    }
+
+    public void markAsPaid() {
+        this.isPaid = true;
+        this.status = "PAID";
+        this.reminderSet = false; // Usuń przypomnienie po opłaceniu
+    }
+
+    public void setReminder(Date reminderDate, String note) {
+        this.reminderDate = reminderDate;
+        this.reminderNote = note;
+        this.reminderSet = true;
+    }
+
+    public void recalculateTotal() {
         this.totalAmount = this.hours * this.ratePerHour;
+    }
+
+    public String toJson() {
+        org.json.JSONObject obj = new org.json.JSONObject();
+        try {
+            obj.put("id", id);
+            obj.put("taskId", taskId);
+            obj.put("clientName", clientName);
+            obj.put("taskName", taskName);
+            obj.put("hours", hours);
+            obj.put("ratePerHour", ratePerHour);
+            obj.put("totalAmount", totalAmount);
+            obj.put("issueDate", issueDate != null ? issueDate.getTime() : 0);
+            obj.put("dueDate", dueDate != null ? dueDate.getTime() : 0);
+            obj.put("isPaid", isPaid);
+            obj.put("status", status);
+            obj.put("isLocalOnly", isLocalOnly);
+            obj.put("reminderSet", reminderSet);
+            obj.put("reminderDate", reminderDate != null ? reminderDate.getTime() : 0);
+            obj.put("reminderNote", reminderNote);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "{}";
+        }
+        return obj.toString();
+    }
+
+    public static Invoice fromJson(String json) {
+        try {
+            org.json.JSONObject obj = new org.json.JSONObject(json);
+            Invoice invoice = new Invoice();
+            invoice.setId(obj.optString("id"));
+            invoice.setTaskId(obj.optString("taskId"));
+            invoice.setClientName(obj.optString("clientName"));
+            invoice.setTaskName(obj.optString("taskName"));
+            invoice.setHours(obj.optDouble("hours"));
+            invoice.setRatePerHour(obj.optDouble("ratePerHour"));
+            invoice.setTotalAmount(obj.optDouble("totalAmount"));
+            if (obj.has("issueDate")) invoice.setIssueDate(new java.util.Date(obj.optLong("issueDate")));
+            if (obj.has("dueDate")) invoice.setDueDate(new java.util.Date(obj.optLong("dueDate")));
+            invoice.setPaid(obj.optBoolean("isPaid"));
+            invoice.setStatus(obj.optString("status"));
+            invoice.setLocalOnly(obj.optBoolean("isLocalOnly", true));
+            invoice.setReminderSet(obj.optBoolean("reminderSet"));
+            if (obj.has("reminderDate")) invoice.setReminderDate(new java.util.Date(obj.optLong("reminderDate")));
+            invoice.setReminderNote(obj.optString("reminderNote"));
+            return invoice;
+        } catch (Exception e) { return null; }
     }
 } 
