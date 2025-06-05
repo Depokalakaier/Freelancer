@@ -15,7 +15,7 @@ import java.util.Locale;
 
 public class SyncController {
 
-    private static final double DEFAULT_RATE = 120.0; // domyślna stawka zł/h
+    // domyślna stawka zł/h
 
     public static void syncTaskCompletion(Context context, Task task) {
         if (!"Ukończone".equals(task.getStatus())) return;
@@ -25,13 +25,13 @@ public class SyncController {
         double hours = workTime != null ? workTime.getTotalHours() : 0;
 
         // 2. Wygeneruj mockowaną fakturę
-        double amount = hours * DEFAULT_RATE;
+        double amount = hours * task.getRatePerHour();
         String dueDate = getFutureDate(7);
         Invoice invoice = new Invoice(
                 task.getId(),
                 task.getClient(),
                 amount,
-                DEFAULT_RATE,
+                task.getRatePerHour(),
                 hours,
                 dueDate,
                 false

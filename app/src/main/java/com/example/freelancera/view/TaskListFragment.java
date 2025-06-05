@@ -997,7 +997,7 @@ public class TaskListFragment extends Fragment {
     }
 
     private void setupRecyclerView() {
-        adapter = new TaskAdapter(new ArrayList<>(), task -> {
+        adapter = new TaskAdapter(requireContext(), new ArrayList<>(), task -> {
             if (getActivity() instanceof MainActivity) {
                 // Save task locally before opening details
                 taskStorage.saveTask(task);

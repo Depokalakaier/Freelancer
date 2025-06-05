@@ -3,6 +3,7 @@ package com.example.freelancera.util;
 import android.content.Context;
 import android.content.SharedPreferences;
 import com.example.freelancera.model.UserSettings;
+import com.example.freelancera.models.Task;
 
 public class SettingsManager {
     private static final String PREFS_NAME = "user_settings";
@@ -25,10 +26,12 @@ public class SettingsManager {
         e.apply();
     }
 
-    public static UserSettings loadSettings(Context context) {
+
+
+    public static UserSettings loadSettings(Context context, Task task) {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         UserSettings settings = new UserSettings();
-        settings.setHourlyRate(prefs.getFloat("hourlyRate", 120f));
+        settings.setHourlyRate(prefs.getFloat("hourlyRate", (float) getRatePerHour(task)));
         settings.setPaymentDueDays(prefs.getInt("paymentDueDays", 7));
         settings.setCompanyName(prefs.getString("companyName", ""));
         settings.setAddress(prefs.getString("address", ""));
@@ -47,4 +50,8 @@ public class SettingsManager {
         android.content.SharedPreferences prefs = context.getSharedPreferences("user_settings", android.content.Context.MODE_PRIVATE);
         return prefs.getString("asanaToken", null);
     }
+    public static double getRatePerHour(Task task) {
+        return task.getRatePerHour();
+    }
+
 }

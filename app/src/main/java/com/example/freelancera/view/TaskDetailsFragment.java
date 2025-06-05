@@ -232,6 +232,22 @@ public class TaskDetailsFragment extends BottomSheetDialogFragment {
         });
     }
 
+    private double roundHours(double rawHours) {
+        // Get the whole hours and minutes
+        int wholeHours = (int) rawHours;
+        double minutesPart = (rawHours - wholeHours) * 60;
+        int minutes = (int) minutesPart;
+
+        // Apply rounding rules
+        if (minutes >= 0 && minutes <= 15) {
+            return wholeHours;
+        } else if (minutes >= 16 && minutes <= 44) {
+            return wholeHours + 0.5;
+        } else {
+            return wholeHours + 1;
+        }
+    }
+
     private void updateUI() {
         if (task == null || !isAdded()) return;
 
@@ -260,10 +276,12 @@ public class TaskDetailsFragment extends BottomSheetDialogFragment {
             }
         }
 
-        // Użyj zaokrąglonych godzin
-        double roundedHours = task.getRoundedHours();
+        long seconds = task.getTogglTrackedSeconds() > 0 ? task.getTogglTrackedSeconds() : task.getTotalTimeInSeconds();
+        double rawHours = seconds / 3600.0;
+        double roundedHours = roundHours(rawHours);
+
         hoursText.setText(String.format(Locale.getDefault(), 
-            "Przepracowane godziny %s", task.getFormattedRoundedHours()));
+            "Przepracowane godziny %.2f", roundedHours));
 
         rateText.setText(String.format(Locale.getDefault(), 
             "Stawka %.0f PLN/h", task.getRatePerHour()));
@@ -273,9 +291,8 @@ public class TaskDetailsFragment extends BottomSheetDialogFragment {
             rateHintView.setVisibility(task.getRatePerHour() > 0 ? View.GONE : View.VISIBLE);
         }
 
-        timeText.setText(task.getFormattedRoundedHours());
+        timeText.setText(String.format(Locale.getDefault(), "%.2f h", roundedHours));
 
-        // Oblicz kwotę na podstawie zaokrąglonych godzin
         double amount = roundedHours * task.getRatePerHour();
         task.setTotalAmount(amount);
         amountText.setText(String.format(Locale.getDefault(), "%.2f PLN", amount));

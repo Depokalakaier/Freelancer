@@ -1,5 +1,6 @@
 package com.example.freelancera.adapter;
 
+import android.content.Context;
 import android.content.res.Configuration;
 import android.text.SpannableString;
 import android.text.style.ForegroundColorSpan;
@@ -23,12 +24,14 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
     
     private List<Task> tasks;
     private final OnTaskClickListener listener;
+    private final Context context;
 
     public interface OnTaskClickListener {
         void onTaskClick(Task task);
     }
 
-    public TaskAdapter(List<Task> tasks, OnTaskClickListener listener) {
+    public TaskAdapter(Context context, List<Task> tasks, OnTaskClickListener listener) {
+        this.context = context;
         this.tasks = tasks;
         this.listener = listener;
     }
@@ -55,13 +58,22 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
     public void updateTasks(List<Task> newTasks) {
         tasks.clear();
         tasks.addAll(newTasks);
-        
-        // Odśwież stawki dla wszystkich zadań
+        for (Task task : tasks) {
+            task.setContext(context);
+        }
+        notifyDataSetChanged();
+        refreshRates();
+    }
+
+    private void refreshRates() {
         AtomicInteger completedUpdates = new AtomicInteger(0);
         int totalTasks = tasks.size();
 
         for (Task task : tasks) {
-            task.updateRateFromFirestore(() -> {
+            if (task != null) {
+                task.setContext(context);
+            }
+            task.updateRateFromFirebase(() -> {
                 if (completedUpdates.incrementAndGet() == totalTasks) {
                     notifyDataSetChanged();
                 }
@@ -77,7 +89,7 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
         private final TextView clientText;
         private final TextView dueDateText;
         private final TextView timeText;
-        private final TextView amountText;
+        private final TextView rateText;
         private final TextView togglProjectText;
         private final TextView togglClientText;
 
@@ -89,7 +101,7 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
             clientText = itemView.findViewById(R.id.text_task_client);
             dueDateText = itemView.findViewById(R.id.text_task_due_date);
             timeText = itemView.findViewById(R.id.text_task_time);
-            amountText = itemView.findViewById(R.id.text_task_amount);
+            rateText = itemView.findViewById(R.id.text_task_rate1);
             togglProjectText = itemView.findViewById(R.id.text_task_toggl_project);
             togglClientText = itemView.findViewById(R.id.text_task_toggl_client);
         }
@@ -105,7 +117,7 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
                 } else {
                     statusText.setText("Ukończono");
                 }
-                if (task.getDueDate() != null) {
+            if (task.getDueDate() != null) {
                     java.util.Calendar calDue = java.util.Calendar.getInstance();
                     calDue.setTime(task.getDueDate());
                     java.util.Calendar calCompleted = java.util.Calendar.getInstance();
@@ -116,7 +128,7 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
                     }
                     boolean isDueToday = calDue.get(java.util.Calendar.YEAR) == calCompleted.get(java.util.Calendar.YEAR)
                             && calDue.get(java.util.Calendar.DAY_OF_YEAR) == calCompleted.get(java.util.Calendar.DAY_OF_YEAR);
-                    dueDateText.setVisibility(View.VISIBLE);
+                dueDateText.setVisibility(View.VISIBLE);
                     dueDateText.setText("");
                     if (isDueToday) {
                         SpannableString span = new SpannableString("Termin do dzisiaj");
@@ -168,9 +180,9 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
                             dueDateText.setText("Termin: " + sdf.format(task.getDueDate()));
                         }
                     }
-                } else {
-                    dueDateText.setVisibility(View.GONE);
-                }
+            } else {
+                dueDateText.setVisibility(View.GONE);
+            }
                 clientText.setVisibility(View.VISIBLE);
                 clientText.setText(task.getClient());
             }
@@ -189,12 +201,22 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
             } else {
                 togglClientText.setVisibility(View.GONE);
             }
+            // Czas z Toggl jeśli jest
+            long togglSec = task.getTogglTrackedSeconds();
+            if (togglSec > 0) {
+                long hours = togglSec / 3600;
+                long minutes = (togglSec % 3600) / 60;
+                timeText.setText(String.format(Locale.getDefault(), "%02d:%02d", hours, minutes));
+            } else {
+            long hours = task.getTotalTimeInSeconds() / 3600;
+            long minutes = (task.getTotalTimeInSeconds() % 3600) / 60;
+            timeText.setText(String.format(Locale.getDefault(), "%02d:%02d", hours, minutes));
+            }
 
-            // Użyj zaokrąglonych godzin
-            timeText.setText(task.getFormattedRoundedHours());
-
-            // Format amount - użyj aktualnej stawki z zadania
-            amountText.setText(String.format(Locale.getDefault(), "%.0f PLN/h", task.getRatePerHour()));
+            // Format amount - Update to use the actual rate from task
+            double rate = task.getRatePerHour();
+          //  amountText.setText(String.format(Locale.getDefault(), "%.0f PLN/h", rate));
+            rateText.setText(String.format(Locale.getDefault(), "Stawka %.0f PLN/h",  task.getRatePerHour()));
 
             // Set card color based on status
             int colorRes;

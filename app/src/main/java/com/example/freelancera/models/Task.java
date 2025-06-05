@@ -232,56 +232,54 @@ public class Task implements Parcelable {
         markForSync();
     }
 
-    public double getRatePerHour() { 
+    public double getRatePerHour() {
         // Jeśli mamy ustawioną stawkę dla tego zadania, użyj jej
         if (ratePerHour > 0) return ratePerHour;
-        
-        // Jeśli nie ma stawki, spróbuj pobrać z Firestore
-        if (context != null) {
-            FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-            if (user != null) {
-                FirebaseFirestore.getInstance()
-                    .collection("users")
-                    .document(user.getUid())
-                    .collection("tasks")
-                    .document(getId())
-                    .get()
-                    .addOnSuccessListener(documentSnapshot -> {
-                        if (documentSnapshot.exists()) {
-                            Double rate = documentSnapshot.getDouble("ratePerHour");
-                            if (rate != null && rate > 0) {
-                                ratePerHour = rate;
-                                // Zapisz lokalnie
-                                TaskStorage storage = new TaskStorage(context);
-                                storage.saveTask(this);
-                            }
-                        }
-                    });
+        // Pobierz stawkę z RateStorage (project_rates) na podstawie tytułu zadania
+        if (context != null && name != null && !name.isEmpty()) {
+            double rate = com.example.freelancera.storage.RateStorage.getProjectRate(context, name);
+            if (rate > 0) {
+                ratePerHour = rate;
+                return rate;
             }
         }
-        
-        return ratePerHour;
+        return 0; // Domyślnie zwróć 0 jeśli brak stawki
     }
-
+    
     public void setRatePerHour(double ratePerHour) { 
         this.ratePerHour = ratePerHour;
-        if (context != null) {
-            // Zapisz do Firestore
-            FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-            if (user != null) {
-                FirebaseFirestore.getInstance()
-                    .collection("users")
-                    .document(user.getUid())
-                    .collection("tasks")
-                    .document(getId())
-                    .update("ratePerHour", ratePerHour);
-                
-                // Zapisz lokalnie
-                TaskStorage storage = new TaskStorage(context);
-                storage.saveTask(this);
-            }
+        calculateTotalAmount();
+        
+        // Zapisz nową stawkę w Firebase
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user != null) {
+            FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(user.getUid())
+                .collection("tasks")
+                .document(getId())
+                .update("ratePerHour", ratePerHour)
+                .addOnSuccessListener(aVoid -> Log.d(TAG, "Rate updated in Firebase"))
+                .addOnFailureListener(e -> Log.e(TAG, "Error updating rate in Firebase", e));
         }
-        markForSync();
+    }
+
+    public void updateRateFromFirebase(Runnable onComplete) {
+        if (context != null && name != null && !name.isEmpty()) {
+            com.example.freelancera.storage.RateStorage.syncWithFirestore(context, name, success -> {
+                if (success) {
+                    double rate = com.example.freelancera.storage.RateStorage.getProjectRate(context, name);
+                    if (rate > 0) {
+                        ratePerHour = rate;
+                    }
+                }
+                if (onComplete != null) {
+                    onComplete.run();
+                }
+            });
+        } else if (onComplete != null) {
+            onComplete.run();
+        }
     }
 
     public Date getDueDate() { return dueDate; }
@@ -430,69 +428,5 @@ public class Task implements Parcelable {
         if (context == null) return;
         TaskStorage storage = new TaskStorage(context);
         storage.saveTask(this);
-    }
-
-    public double getRoundedHours() {
-        long seconds = togglTrackedSeconds > 0 ? togglTrackedSeconds : totalTimeInSeconds;
-        double exactHours = seconds / 3600.0;
-        
-        // Wydziel pełne godziny i minuty
-        int fullHours = (int) exactHours;
-        int minutes = (int) ((exactHours - fullHours) * 60);
-        
-        // Zaokrąglij według schematu
-        if (minutes <= 15) {
-            return fullHours;
-        } else if (minutes <= 44) {
-            return fullHours + 0.5;
-        } else {
-            return fullHours + 1;
-        }
-    }
-
-    public String getFormattedRoundedHours() {
-        double roundedHours = getRoundedHours();
-        int hours = (int) roundedHours;
-        int minutes = (int) ((roundedHours - hours) * 60);
-        return String.format(Locale.getDefault(), "%d:%02d", hours, minutes);
-    }
-
-    public void updateRateFromFirestore(Runnable onComplete) {
-        if (context == null || id == null) {
-            if (onComplete != null) onComplete.run();
-            return;
-        }
-
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) {
-            if (onComplete != null) onComplete.run();
-            return;
-        }
-
-        FirebaseFirestore.getInstance()
-            .collection("users")
-            .document(user.getUid())
-            .collection("tasks")
-            .document(id)
-            .get()
-            .addOnSuccessListener(documentSnapshot -> {
-                if (documentSnapshot.exists()) {
-                    Double rate = documentSnapshot.getDouble("ratePerHour");
-                    if (rate != null && rate > 0) {
-                        ratePerHour = rate;
-                        // Zapisz lokalnie
-                        TaskStorage storage = new TaskStorage(context);
-                        storage.saveTask(this);
-                    }
-                }
-                if (onComplete != null) {
-                    onComplete.run();
-                }
-            })
-            .addOnFailureListener(e -> {
-                if (onComplete != null) {
-                    onComplete.run();
-                }
-            });
     }
 } 
