@@ -110,82 +110,46 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
             titleText.setText(task.getName());
             String status = task.getStatus();
             
-            if ("Ukończone".equals(status)) {
+            if (task.isCompletedStatus()) {
                 if (task.getCompletedAt() != null) {
                     java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd.MM.yyyy", java.util.Locale.getDefault());
                     statusText.setText("Ukończono " + sdf.format(task.getCompletedAt()));
                 } else {
                     statusText.setText("Ukończono");
                 }
-            if (task.getDueDate() != null) {
-                    java.util.Calendar calDue = java.util.Calendar.getInstance();
-                    calDue.setTime(task.getDueDate());
-                    java.util.Calendar calCompleted = java.util.Calendar.getInstance();
-                    if (task.getCompletedAt() != null) {
-                        calCompleted.setTime(task.getCompletedAt());
-                    } else {
-                        calCompleted = java.util.Calendar.getInstance();
-                    }
-                    boolean isDueToday = calDue.get(java.util.Calendar.YEAR) == calCompleted.get(java.util.Calendar.YEAR)
-                            && calDue.get(java.util.Calendar.DAY_OF_YEAR) == calCompleted.get(java.util.Calendar.DAY_OF_YEAR);
-                dueDateText.setVisibility(View.VISIBLE);
-                    dueDateText.setText("");
-                    if (isDueToday) {
-                        SpannableString span = new SpannableString("Termin do dzisiaj");
-                        span.setSpan(new ForegroundColorSpan(ContextCompat.getColor(itemView.getContext(), R.color.gray)), 0, span.length(), 0);
-                        span.setSpan(new RelativeSizeSpan(0.95f), 0, span.length(), 0);
-                        dueDateText.setText(span);
-                    } else {
-                        long diffDays = (calCompleted.getTimeInMillis() - calDue.getTimeInMillis()) / (1000 * 60 * 60 * 24);
-                        if (diffDays > 0) {
-                            String info = diffDays == 1 ? "1 dzień po terminie" : diffDays + " dni po terminie";
-                            SpannableString span = new SpannableString(info);
-                            span.setSpan(new ForegroundColorSpan(ContextCompat.getColor(itemView.getContext(), R.color.gray)), 0, info.length(), 0);
-                            span.setSpan(new RelativeSizeSpan(0.95f), 0, info.length(), 0);
-                            dueDateText.setText(span);
-                        } else {
-                            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd.MM.yyyy", java.util.Locale.getDefault());
-                            dueDateText.setText("Termin: " + sdf.format(task.getDueDate()));
-                        }
-                    }
-                } else {
-                    dueDateText.setVisibility(View.GONE);
-                }
-                clientText.setVisibility(View.VISIBLE);
-                clientText.setText(task.getClient());
             } else {
                 statusText.setText(task.getStatus());
-                if (task.getDueDate() != null) {
-                    java.util.Calendar calDue = java.util.Calendar.getInstance();
-                    calDue.setTime(task.getDueDate());
-                    java.util.Calendar calToday = java.util.Calendar.getInstance();
-                    boolean isDueToday = calDue.get(java.util.Calendar.YEAR) == calToday.get(java.util.Calendar.YEAR)
-                            && calDue.get(java.util.Calendar.DAY_OF_YEAR) == calToday.get(java.util.Calendar.DAY_OF_YEAR);
-                    dueDateText.setVisibility(View.VISIBLE);
-                    if (isDueToday) {
-                        SpannableString span = new SpannableString("Termin do dzisiaj");
-                        span.setSpan(new ForegroundColorSpan(ContextCompat.getColor(itemView.getContext(), R.color.red)), 0, span.length(), 0);
-                        span.setSpan(new RelativeSizeSpan(0.95f), 0, span.length(), 0);
+            }
+            if (task.getDueDate() != null) {
+                java.util.Calendar calDue = java.util.Calendar.getInstance();
+                calDue.setTime(task.getDueDate());
+                java.util.Calendar calToday = java.util.Calendar.getInstance();
+                boolean isDueToday = calDue.get(java.util.Calendar.YEAR) == calToday.get(java.util.Calendar.YEAR)
+                        && calDue.get(java.util.Calendar.DAY_OF_YEAR) == calToday.get(java.util.Calendar.DAY_OF_YEAR);
+                dueDateText.setVisibility(View.VISIBLE);
+                if (isDueToday) {
+                    SpannableString span = new SpannableString("Termin do dzisiaj");
+                    span.setSpan(new ForegroundColorSpan(ContextCompat.getColor(itemView.getContext(), R.color.red)), 0, span.length(), 0);
+                    span.setSpan(new RelativeSizeSpan(0.95f), 0, span.length(), 0);
+                    dueDateText.setText(span);
+                } else {
+                    long diffDays = (calToday.getTimeInMillis() - calDue.getTimeInMillis()) / (1000 * 60 * 60 * 24);
+                    if (diffDays > 0) {
+                        String info = diffDays == 1 ? "1 dzień po terminie" : diffDays + " dni po terminie";
+                        SpannableString span = new SpannableString(info);
+                        span.setSpan(new ForegroundColorSpan(ContextCompat.getColor(itemView.getContext(), R.color.red)), 0, info.length(), 0);
+                        span.setSpan(new RelativeSizeSpan(0.95f), 0, info.length(), 0);
                         dueDateText.setText(span);
                     } else {
-                        long diffDays = (calToday.getTimeInMillis() - calDue.getTimeInMillis()) / (1000 * 60 * 60 * 24);
-                        if (diffDays > 0) {
-                            String info = diffDays == 1 ? "1 dzień po terminie" : diffDays + " dni po terminie";
-                            SpannableString span = new SpannableString(info);
-                            span.setSpan(new ForegroundColorSpan(ContextCompat.getColor(itemView.getContext(), R.color.red)), 0, info.length(), 0);
-                            span.setSpan(new RelativeSizeSpan(0.95f), 0, info.length(), 0);
-                            dueDateText.setText(span);
-                        } else {
-                            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd.MM.yyyy", java.util.Locale.getDefault());
-                            dueDateText.setText("Termin: " + sdf.format(task.getDueDate()));
-                        }
+                        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd.MM.yyyy", java.util.Locale.getDefault());
+                        dueDateText.setText("Termin: " + sdf.format(task.getDueDate()));
                     }
+                }
             } else {
                 dueDateText.setVisibility(View.GONE);
             }
-                clientText.setVisibility(View.VISIBLE);
-                clientText.setText(task.getClient());
-            }
+            clientText.setVisibility(View.VISIBLE);
+            clientText.setText(task.getClient());
 
             // Projekt z Toggl pod statusem
             if (task.getTogglProjectName() != null && !task.getTogglProjectName().isEmpty()) {
@@ -220,20 +184,20 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
 
             // Set card color based on status
             int colorRes;
-            
-            switch (status) {
-                case "Nowe":
-                    colorRes = R.color.task_new;
-                    break;
-                case "W toku":
-                    colorRes = R.color.task_in_progress;
-                    break;
-                case "Ukończone":
-                    colorRes = R.color.task_completed;
-                    break;
-                default:
-                    colorRes = R.color.task_default;
-                    break;
+            if (task.isCompletedStatus()) {
+                colorRes = R.color.task_completed;
+            } else {
+                switch (status) {
+                    case "Nowe":
+                        colorRes = R.color.task_new;
+                        break;
+                    case "W toku":
+                        colorRes = R.color.task_in_progress;
+                        break;
+                    default:
+                        colorRes = R.color.task_default;
+                        break;
+                }
             }
             
             try {

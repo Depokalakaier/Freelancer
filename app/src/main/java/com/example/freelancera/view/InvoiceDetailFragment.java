@@ -5,10 +5,7 @@ import androidx.fragment.app.Fragment;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.CompoundButton;
-import android.widget.Switch;
 import android.widget.TextView;
-import android.widget.Toast;
 import com.example.freelancera.R;
 import com.example.freelancera.models.Invoice;
 import com.example.freelancera.util.JsonLoader;
@@ -18,14 +15,14 @@ import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.example.freelancera.util.LocalInvoiceStorage;
 import com.example.freelancera.auth.AsanaApi;
+import android.util.Log;
 
 public class InvoiceDetailFragment extends Fragment {
 
     private static final String ARG_INVOICE = "invoice";
     private Invoice invoice;
 
-    private TextView titleText, clientText, amountText, dateText, paidStatusText;
-    private Switch paidSwitch;
+    private TextView headerText, numberText, issueDateText, clientText, clientAddressText, taskDescText, hoursText, rateText, amountText, totalText, dueDateText, footerText;
 
     public static InvoiceDetailFragment newInstance(Invoice invoice) {
         InvoiceDetailFragment fragment = new InvoiceDetailFragment();
@@ -41,77 +38,64 @@ public class InvoiceDetailFragment extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_invoice_detail, container, false);
 
-        titleText = view.findViewById(R.id.text_invoice_title);
-        clientText = view.findViewById(R.id.text_invoice_client);
-        amountText = view.findViewById(R.id.text_invoice_amount);
-        dateText = view.findViewById(R.id.text_invoice_date);
-        paidStatusText = view.findViewById(R.id.text_paid_status);
-        paidSwitch = view.findViewById(R.id.switch_paid);
+        headerText = view.findViewById(R.id.invoice_header);
+        numberText = view.findViewById(R.id.invoice_number);
+        issueDateText = view.findViewById(R.id.invoice_issue_date);
+        clientText = view.findViewById(R.id.invoice_client);
+        clientAddressText = view.findViewById(R.id.invoice_client_address);
+        taskDescText = view.findViewById(R.id.invoice_task_desc);
+        hoursText = view.findViewById(R.id.invoice_hours);
+        rateText = view.findViewById(R.id.invoice_rate);
+        amountText = view.findViewById(R.id.invoice_amount);
+        totalText = view.findViewById(R.id.invoice_total);
+        dueDateText = view.findViewById(R.id.invoice_due_date);
+        footerText = view.findViewById(R.id.invoice_footer);
 
         if (getArguments() != null) {
             invoice = getArguments().getParcelable(ARG_INVOICE);
         }
 
         if (invoice != null) {
-            titleText.setText(invoice.getTaskName());
-            clientText.setText(invoice.getClientName());
-            amountText.setText(String.format("%.2f PLN", invoice.getTotalAmount()));
+            headerText.setText("FAKTURA");
+            numberText.setText("Nr: " + (invoice.getId() != null ? invoice.getId() : "-"));
             java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd.MM.yyyy");
-            dateText.setText(sdf.format(invoice.getIssueDate()));
-            paidStatusText.setText(invoice.isPaid() ? "Opłacona" : "Nieopłacona");
-            paidSwitch.setChecked(invoice.isPaid());
-        }
-
-        paidSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                if (invoice != null) {
-                    invoice.setPaid(isChecked);
-                    paidStatusText.setText(isChecked ? "Opłacona" : "Nieopłacona");
-                    if (isChecked) {
-                        invoice.setLocalOnly(false);
-                        // Zapisz do Firebase
-                        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-                        if (user != null && invoice.getId() != null) {
-                            FirebaseFirestore.getInstance()
-                                .collection("users").document(user.getUid())
-                                .collection("invoices").document(invoice.getId())
-                                .set(invoice);
-                        }
-                        // Usuń z lokalnych faktur
-                        LocalInvoiceStorage.removeInvoice(getContext(), invoice.getId());
-                        // Usuń zadanie z Firestore
-                        if (user != null && invoice.getTaskId() != null) {
-                            FirebaseFirestore.getInstance()
-                                .collection("users").document(user.getUid())
-                                .collection("tasks").document(invoice.getTaskId())
-                                .delete();
-                        }
-                        // Usuń zadanie z Asany (jeśli jest taskId i token)
-                        if (invoice.getTaskId() != null) {
-                            AsanaApi.deleteTask(requireContext(), invoice.getTaskId(), new AsanaApi.DeletionCallback() {
-                                @Override
-                                public void onSuccess() {
-                                    if (getActivity() != null) getActivity().getSupportFragmentManager().popBackStack();
-                                }
-                                @Override
-                                public void onFailure(String error) {
-                                    Toast.makeText(getContext(), "Błąd usuwania zadania z Asany: " + error, Toast.LENGTH_SHORT).show();
-                                    if (getActivity() != null) getActivity().getSupportFragmentManager().popBackStack();
-                                }
-                            });
-                        } else {
-                            Toast.makeText(getContext(), "Zadanie usunięte tylko z Firebase (brak powiązania z Asaną)", Toast.LENGTH_SHORT).show();
-                            if (getActivity() != null) getActivity().getSupportFragmentManager().popBackStack();
-                        }
-                    } else {
-                        // Jeśli cofnięto opłacenie, przywróć do lokalnych faktur
-                        invoice.setLocalOnly(true);
-                        LocalInvoiceStorage.saveInvoice(getContext(), invoice);
-                    }
-                }
+            String issueDateStr = "-";
+            String dueDateStr = "-";
+            try {
+                if (invoice.getIssueDate() != null) issueDateStr = sdf.format(invoice.getIssueDate());
+            } catch (Exception e) {
+                Log.w("InvoiceDetail", "Błąd formatowania issueDate", e);
             }
-        });
+            try {
+                if (invoice.getDueDate() != null) dueDateStr = sdf.format(invoice.getDueDate());
+            } catch (Exception e) {
+                Log.w("InvoiceDetail", "Błąd formatowania dueDate", e);
+            }
+            issueDateText.setText("Data wystawienia: " + issueDateStr);
+            clientText.setText("Klient: " + (invoice.getClientName() != null ? invoice.getClientName() : "-"));
+            clientAddressText.setText("Adres: (adres przykładowy)");
+            taskDescText.setText(invoice.getTaskName() != null ? invoice.getTaskName() : "-");
+            hoursText.setText(String.valueOf(invoice.getHours()));
+            rateText.setText(String.format("%.2f zł", invoice.getRatePerHour()));
+            amountText.setText(String.format("%.2f zł", invoice.getTotalAmount()));
+            totalText.setText("Do zapłaty: " + String.format("%.2f zł", invoice.getTotalAmount()));
+            dueDateText.setText("Termin płatności: " + dueDateStr);
+            footerText.setText("(To jest faktura robocza, wygenerowana automatycznie)");
+        } else {
+            Log.e("InvoiceDetail", "Invoice przekazany do fragmentu jest nullem!");
+            headerText.setText("FAKTURA");
+            numberText.setText("Nr: -");
+            issueDateText.setText("Data wystawienia: -");
+            clientText.setText("Klient: -");
+            clientAddressText.setText("Adres: -");
+            taskDescText.setText("-");
+            hoursText.setText("-");
+            rateText.setText("-");
+            amountText.setText("-");
+            totalText.setText("Do zapłaty: -");
+            dueDateText.setText("Termin płatności: -");
+            footerText.setText("(To jest faktura robocza, wygenerowana automatycznie)");
+                    }
 
         return view;
     }

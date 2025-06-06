@@ -192,35 +192,20 @@ public class Task implements Parcelable {
         markForSync();
     }
 
-    public String getStatus() { 
-        // Zawsze zwracaj prawidłowy status
-        if (status == null || status.isEmpty()) {
-            return "Nowe";
-        }
-        // Normalizuj status do jednej z trzech dozwolonych wartości
-        switch (status) {
-            case "Nowe":
-            case "W toku":
-            case "Ukończone":
-                return status;
-            default:
-                return "Nowe";
-        }
+    public String getStatus() {
+        return status != null ? status : "Nowe";
     }
-
-    public void setStatus(String status) { 
-        // Akceptuj tylko prawidłowe statusy
-        switch (status) {
-            case "Nowe":
-            case "W toku":
-            case "Ukończone":
-                this.status = status;
-                break;
-            default:
-                this.status = "Nowe";
-                break;
+    public boolean isCompletedStatus() {
+        return status != null && status.startsWith("Ukończone");
+    }
+    public void setStatus(String status) {
+        // Akceptuj statusy: Nowe, W toku, Ukończone, Ukończone (faktura utworzona)
+        if ("Nowe".equals(status) || "W toku".equals(status) || "Ukończone".equals(status) || "Ukończone (faktura utworzona)".equals(status)) {
+            this.status = status;
+        } else {
+            this.status = "Nowe";
         }
-        if ("Ukończone".equals(status)) {
+        if (status != null && status.startsWith("Ukończone")) {
             this.completedDate = new Date();
         }
         markForSync();

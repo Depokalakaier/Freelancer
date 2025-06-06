@@ -52,6 +52,10 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
+import androidx.work.PeriodicWorkRequest;
+import androidx.work.WorkManager;
+import androidx.work.ExistingPeriodicWorkPolicy;
+import java.util.concurrent.TimeUnit;
 
 /**
  * MainActivity - główna aktywność aplikacji Freelancer.
@@ -99,6 +103,18 @@ public class MainActivity extends AppCompatActivity {
             }, 5000);
             syncTogglData();
         }
+
+        // Rejestracja cyklicznego WorkManagera
+        PeriodicWorkRequest syncRequest = new PeriodicWorkRequest.Builder(
+            com.example.freelancera.util.SyncWorker.class,
+            1, TimeUnit.HOURS)
+            .build();
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "cyclic_sync",
+            ExistingPeriodicWorkPolicy.KEEP,
+            syncRequest
+        );
+        android.util.Log.i("SyncWorker", "Zarejestrowano cykliczną synchronizację co godzinę");
     }
 
     @Override
@@ -246,10 +262,10 @@ public class MainActivity extends AppCompatActivity {
                         .commit();
                     return true;
                 } else if (itemId == R.id.navigation_history) {
-                    // Zakładka Historia - pusta
+                    // Zakładka Historia - poprawnie wstaw HistoryFragment
                     getSupportFragmentManager()
                         .beginTransaction()
-                        .replace(R.id.fragment_container, new androidx.fragment.app.Fragment())
+                        .replace(R.id.fragment_container, new com.example.freelancera.view.HistoryFragment())
                         .commit();
                     return true;
                 }

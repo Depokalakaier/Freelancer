@@ -55,6 +55,11 @@ import com.google.android.material.textfield.TextInputEditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import com.example.freelancera.storage.TaskStorage;
+import android.Manifest;
+import android.content.pm.PackageManager;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import com.example.freelancera.util.CalendarUtils;
 
 /**
  * TaskListFragment - fragment wyświetlający listę zadań użytkownika.
@@ -83,6 +88,9 @@ public class TaskListFragment extends Fragment {
     private FirebaseUser user;
 
     private TaskStorage taskStorage;
+
+    private static final int CALENDAR_PERMISSION_REQUEST_CODE = 1001;
+    private Task pendingCalendarTask = null;
 
     /**
      * Konstruktor domyślny.
@@ -199,7 +207,7 @@ public class TaskListFragment extends Fragment {
                     task.setContext(getContext());
                     allTasks.add(task);
                     taskStorage.saveTask(task);
-                    if ("Ukończone".equals(task.getStatus()) && !task.isHasInvoice()) {
+                    if (task.isCompletedStatus() && !task.isHasInvoice()) {
                         handleCompletedTask(task);
                     }
                 }
@@ -575,7 +583,7 @@ public class TaskListFragment extends Fragment {
                         task.setContext(getContext());
                         allTasks.add(task);
                         taskStorage.saveTask(task);
-                        if ("Ukończone".equals(task.getStatus()) && !task.isHasInvoice()) {
+                        if (task.isCompletedStatus() && !task.isHasInvoice()) {
                             handleCompletedTask(task);
                         }
                     }
@@ -670,6 +678,7 @@ public class TaskListFragment extends Fragment {
                                                             Log.e(TAG, "[TOGGL] Błąd pobierania klientów: " + e.getMessage());
                                                             mergeAsanaWithTogglProjects(projects, null, uid);
                                                         }
+
                                                         @Override
                                                         public void onResponse(okhttp3.Call call, okhttp3.Response response) throws IOException {
                                                             org.json.JSONArray clients = null;
@@ -837,15 +846,14 @@ public class TaskListFragment extends Fragment {
         Invoice invoice = new Invoice(task.getId(), task.getClient(), task.getName(), task.getRatePerHour());
         invoice.setHours(task.getTogglTrackedSeconds() / 3600.0); // Konwersja sekund na godziny
         invoice.recalculateTotal();
-        
         String uid = FirebaseAuth.getInstance().getCurrentUser().getUid();
         firestore.collection("users").document(uid)
                 .collection("invoices").add(invoice)
                     .addOnSuccessListener(documentReference -> {
                     invoice.setId(documentReference.getId());
-                        task.setHasInvoice(true);
+                    task.setHasInvoice(true);
                     task.setInvoiceNumber(documentReference.getId());
-                    
+                    // NIE zmieniaj statusu na 'Ukończone (faktura utworzona)'
                     // Aktualizuj zadanie w Firestore i lokalnie
                     firestore.collection("users").document(uid)
                             .collection("tasks").document(task.getId())
@@ -854,6 +862,8 @@ public class TaskListFragment extends Fragment {
                                 taskStorage.saveTask(task);
                                 Toast.makeText(getContext(), "Utworzono fakturę roboczą", Toast.LENGTH_SHORT).show();
                             });
+                    // Dodaj przypomnienie do kalendarza
+                    addCalendarReminder(task);
                     })
                     .addOnFailureListener(e -> {
                     Toast.makeText(getContext(), "Błąd tworzenia faktury: " + e.getMessage(), Toast.LENGTH_SHORT).show();
@@ -861,27 +871,42 @@ public class TaskListFragment extends Fragment {
     }
 
     private void addCalendarReminder(Task task) {
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.WRITE_CALENDAR) != PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.READ_CALENDAR) != PackageManager.PERMISSION_GRANTED) {
+            // Poproś o uprawnienia
+            pendingCalendarTask = task;
+            ActivityCompat.requestPermissions(requireActivity(),
+                new String[]{Manifest.permission.WRITE_CALENDAR, Manifest.permission.READ_CALENDAR},
+                CALENDAR_PERMISSION_REQUEST_CODE);
+            return;
+        }
+        if (task.isHasInvoice()) return; // nie dodawaj przypomnienia jeśli faktura opłacona lub już istnieje
         Calendar calendar = Calendar.getInstance();
         calendar.add(Calendar.DAY_OF_MONTH, 1); // Przypomnienie na następny dzień
+        com.example.freelancera.util.CalendarUtils.addEventDirectly(
+            requireContext(),
+            task.getClient(),
+            "Wyślij fakturę do klienta: " + task.getClient() + ", zadanie: " + task.getName(),
+            calendar.getTimeInMillis()
+        );
+        addSyncHistory(task, "REMINDER_ADDED", 
+            "Dodano przypomnienie do kalendarza", true, null);
+    }
 
-        Intent intent = new Intent(Intent.ACTION_INSERT)
-                .setData(CalendarContract.Events.CONTENT_URI)
-                .putExtra(CalendarContract.Events.TITLE, "Wyślij fakturę: " + task.getName())
-                .putExtra(CalendarContract.Events.DESCRIPTION, 
-                    "Wyślij fakturę do klienta: " + task.getClient())
-                .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, calendar.getTimeInMillis())
-                .putExtra(CalendarContract.EXTRA_EVENT_END_TIME, 
-                    calendar.getTimeInMillis() + 60 * 60 * 1000)
-                .putExtra(CalendarContract.Events.ALL_DAY, false)
-                .putExtra(CalendarContract.Events.HAS_ALARM, true);
-
-        try {
-            startActivity(intent);
-            addSyncHistory(task, "REMINDER_ADDED", 
-                "Dodano przypomnienie do kalendarza", true, null);
-        } catch (Exception e) {
-            addSyncHistory(task, "REMINDER_FAILED", 
-                "Błąd dodawania przypomnienia", false, e.getMessage());
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == CALENDAR_PERMISSION_REQUEST_CODE) {
+            boolean granted = true;
+            for (int res : grantResults) {
+                if (res != PackageManager.PERMISSION_GRANTED) granted = false;
+            }
+            if (granted && pendingCalendarTask != null) {
+                addCalendarReminder(pendingCalendarTask);
+                pendingCalendarTask = null;
+            } else {
+                Toast.makeText(getContext(), "Brak zgody na dostęp do kalendarza!", Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
@@ -951,10 +976,10 @@ public class TaskListFragment extends Fragment {
         // 3. Sortowanie:
         Collections.sort(filteredTasks, (task1, task2) -> {
             // Ukończone zadania zawsze na końcu
-            if (task1.getStatus().equals("Ukończone") && !task2.getStatus().equals("Ukończone")) {
+            if (task1.isCompletedStatus() && !task2.isCompletedStatus()) {
                 return 1;
             }
-            if (!task1.getStatus().equals("Ukończone") && task2.getStatus().equals("Ukończone")) {
+            if (!task1.isCompletedStatus() && task2.isCompletedStatus()) {
                 return -1;
             }
             

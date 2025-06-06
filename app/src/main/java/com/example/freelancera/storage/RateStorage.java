@@ -8,6 +8,7 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import org.json.JSONObject;
 import java.util.HashMap;
 import java.util.Map;
+import android.util.Log;
 
 public class RateStorage {
     private static final String PREFS_NAME = "project_rates";
@@ -24,6 +25,7 @@ public class RateStorage {
             // Save rate locally
             rates.put(projectName, rate);
             prefs.edit().putString(KEY_RATES, rates.toString()).apply();
+            Log.d("RateStorage", "Zapisano stawkę lokalnie dla " + projectName + ": " + rate);
 
             // Save to Firestore
             FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
@@ -37,10 +39,12 @@ public class RateStorage {
                     .document(user.getUid())
                     .collection("project_rates")
                     .document(projectName)
-                    .set(rateData);
+                    .set(rateData)
+                    .addOnSuccessListener(aVoid -> Log.d("RateStorage", "Zapisano stawkę w Firestore dla " + projectName))
+                    .addOnFailureListener(e -> Log.e("RateStorage", "Błąd zapisu stawki w Firestore dla " + projectName, e));
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.e("RateStorage", "Wyjątek przy zapisie stawki", e);
         }
     }
 
@@ -84,11 +88,16 @@ public class RateStorage {
                     Double rate = documentSnapshot.getDouble("rate");
                     if (rate != null) {
                         saveProjectRate(context, projectName, rate);
+                        Log.d("RateStorage", "Pobrano stawkę z Firestore dla " + projectName + ": " + rate);
                         if (listener != null) listener.onSyncComplete(true);
                     }
+                } else {
+                    Log.w("RateStorage", "Brak dokumentu stawki w Firestore dla " + projectName);
+                    if (listener != null) listener.onSyncComplete(false);
                 }
             })
             .addOnFailureListener(e -> {
+                Log.e("RateStorage", "Błąd pobierania stawki z Firestore dla " + projectName, e);
                 if (listener != null) listener.onSyncComplete(false);
             });
     }

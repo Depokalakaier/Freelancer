@@ -18,7 +18,7 @@ public class SyncController {
     // domyślna stawka zł/h
 
     public static void syncTaskCompletion(Context context, Task task) {
-        if (!"Ukończone".equals(task.getStatus())) return;
+        if (task == null || !task.isCompletedStatus()) return;
 
         // 1. Pobierz mockowany czas pracy (z symulacji/mocka)
         WorkTime workTime = JsonLoader.findWorkTimeByTaskId(context, task.getId());
@@ -39,14 +39,16 @@ public class SyncController {
         // TODO: Zapisz fakturę do pliku lub bazy (np. InvoiceRepository.save(invoice))
 
         // 3. Dodaj przypomnienie do kalendarza (na następny dzień)
-        Calendar cal = Calendar.getInstance();
-        cal.add(Calendar.DAY_OF_YEAR, 1);
-        CalendarUtils.addEventToCalendar(
+        if (!invoice.isPaid()) {
+            Calendar cal = Calendar.getInstance();
+            cal.add(Calendar.DAY_OF_YEAR, 1);
+            CalendarUtils.addEventDirectly(
                 context,
-                "Wyślij fakturę do " + task.getClient(),
+                task.getClient(),
                 "Zadanie: " + task.getName(),
                 cal.getTimeInMillis()
-        );
+            );
+        }
 
         // 4. Dodaj wpis do historii synchronizacji
         SyncHistory history = new SyncHistory(
