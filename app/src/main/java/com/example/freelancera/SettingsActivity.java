@@ -30,15 +30,14 @@ public class SettingsActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_settings);
+
 
         auth = FirebaseAuth.getInstance();
         firestore = FirebaseFirestore.getInstance();
         prefs = getSharedPreferences("settings", MODE_PRIVATE);
 
-        themeSwitch = findViewById(R.id.themeSwitch);
         connectAsanaButton = findViewById(R.id.connectAsanaButton);
-        asanaStatusText = findViewById(R.id.asanaStatusText);
+
 
         // Ustawienie początkowego stanu przełącznika motywu
         boolean isDarkMode = prefs.getBoolean(PREF_DARK_MODE, false);

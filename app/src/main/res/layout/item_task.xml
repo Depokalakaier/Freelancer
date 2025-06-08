@@ -3,10 +3,11 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginHorizontal="8dp"
-    android:layout_marginVertical="4dp"
-    app:cardCornerRadius="8dp"
-    app:cardElevation="2dp">
+    app:cardCornerRadius="16dp"
+    app:cardElevation="4dp"
+    android:layout_marginTop="12dp"
+    android:layout_marginBottom="12dp"
+    android:backgroundTint="#101517">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -14,80 +15,94 @@
         android:orientation="vertical"
         android:padding="16dp">
 
+        <!-- Góra: tytuł -->
         <TextView
             android:id="@+id/text_task_title"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:textColor="#F2F2F2"
             android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp"/>
+            android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/text_task_status"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textSize="14sp"
-            android:layout_marginBottom="2dp"/>
-
-        <TextView
-            android:id="@+id/text_task_toggl_project"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textSize="13sp"
-            android:textColor="#888"
-            android:layout_marginBottom="2dp"
-            android:visibility="gone"/>
-
-        <TextView
-            android:id="@+id/text_task_toggl_client"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textSize="13sp"
-            android:textColor="#888"
-            android:layout_marginBottom="2dp"
-            android:visibility="gone"/>
-
+        <!-- Klient -->
         <TextView
             android:id="@+id/text_task_client"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textSize="14sp"
-            android:layout_marginBottom="4dp"/>
-
-        <TextView
-            android:id="@+id/text_task_due_date"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textSize="14sp"
-            android:layout_marginBottom="8dp"/>
-
-        <View
             android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="?android:attr/listDivider"
-            android:layout_marginBottom="8dp"/>
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textColor="#CCCCCC"
+            android:textSize="14sp"
+            android:fontFamily="sans-serif" />
 
+        <!-- Termin i status w jednym rzędzie -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:layout_marginTop="4dp">
+        <TextView
+                android:id="@+id/text_task_due_date"
+                android:layout_width="0dp"
+            android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="#CCCCCC"
+            android:textSize="14sp"
+                android:fontFamily="sans-serif" />
+        <TextView
+                android:id="@+id/text_task_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+                android:background="@drawable/bg_status"
+                android:paddingLeft="12dp"
+                android:paddingTop="4dp"
+                android:paddingRight="12dp"
+                android:paddingBottom="4dp"
+                android:textColor="#E4DDD6"
+            android:textSize="14sp"
+                android:fontFamily="sans-serif"
+                android:layout_marginStart="8dp" />
+        </LinearLayout>
 
+        <!-- Godziny i stawka w jednym rzędzie -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="10dp">
             <TextView
                 android:id="@+id/text_task_time"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:textColor="#CCCCCC"
                 android:textSize="14sp"
-                android:textStyle="bold"/>
-
+                android:fontFamily="sans-serif" />
             <TextView
                 android:id="@+id/text_task_rate1"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:textColor="#CCCCCC"
                 android:textSize="14sp"
-                android:textStyle="bold"/>
-
+                android:fontFamily="sans-serif" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/text_task_toggl_project"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="2dp"
+            android:textColor="#888"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/text_task_toggl_client"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="2dp"
+            android:textColor="#888"
+            android:textSize="13sp"
+            android:visibility="gone" />
 
     </LinearLayout>
 

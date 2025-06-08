@@ -121,9 +121,12 @@ public class InvoiceListFragment extends Fragment {
                                     }
                                 }
                                 boolean isNewInvoice = (invoice == null);
-                                if (invoice == null) {
-                                    invoice = new com.example.freelancera.models.Invoice();
-                                    invoice.setTaskId(task.getId());
+                                if (isNewInvoice) {
+                                    invoice = new com.example.freelancera.models.Invoice(task.getId(), task.getClient(), task.getName(), rate);
+                                    invoice.setHours(hours);
+                                    invoice.setTotalAmount(amount);
+                                    invoice.setId("FV-" + new java.text.SimpleDateFormat("yyyyMMdd-HHmmssSSS").format(new java.util.Date()));
+                                    invoice.setLocalOnly(false);
                                 }
                                 invoice.setTaskName(task.getName());
                                 invoice.setClientName(task.getClient());
@@ -142,11 +145,6 @@ public class InvoiceListFragment extends Fragment {
                                 // Termin płatności = 7 dni po dacie zakończenia
                                 java.util.Date due = new java.util.Date(issue.getTime() + 7 * 24 * 60 * 60 * 1000);
                                 invoice.setDueDate(due);
-                                invoice.setId("FV-" + new java.text.SimpleDateFormat("yyyyMMdd").format(issue) + "-" + task.getId());
-                                if (isNewInvoice) {
-                                    invoice.setStatus("DRAFT");
-                                    invoice.setPaid(false);
-                                }
                                 if (!invoices.contains(invoice)) {
                                     invoices.add(invoice);
                                 }

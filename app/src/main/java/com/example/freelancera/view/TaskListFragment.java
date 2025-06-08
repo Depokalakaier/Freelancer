@@ -60,6 +60,7 @@ import android.content.pm.PackageManager;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import com.example.freelancera.util.CalendarUtils;
+import android.widget.Button;
 
 /**
  * TaskListFragment - fragment wyświetlający listę zadań użytkownika.
@@ -74,7 +75,7 @@ public class TaskListFragment extends Fragment {
     private ChipGroup statusFilterGroup;
     private TextInputEditText searchEditText;
     private LinearLayout filtersPanel;
-    private TextView btnToggleFilters;
+    private Button filterButton;
 
     // Adapter
     private TaskAdapter adapter;
@@ -114,7 +115,7 @@ public class TaskListFragment extends Fragment {
         statusFilterGroup = view.findViewById(R.id.status_filter_group);
         searchEditText = view.findViewById(R.id.search_edit_text);
         filtersPanel = view.findViewById(R.id.filters_panel);
-        btnToggleFilters = view.findViewById(R.id.btn_toggle_filters);
+        filterButton = view.findViewById(R.id.filterButton);
 
         // Setup RecyclerView
         setupRecyclerView();
@@ -155,19 +156,17 @@ public class TaskListFragment extends Fragment {
             });
         }
 
-        if (btnToggleFilters != null && filtersPanel != null) {
-            btnToggleFilters.setOnClickListener(v -> {
+        if (filterButton != null && filtersPanel != null) {
+            filterButton.setOnClickListener(v -> {
                 if (filtersPanel.getVisibility() == View.VISIBLE) {
                     filtersPanel.animate().alpha(0f).setDuration(200).withEndAction(() -> {
                         filtersPanel.setVisibility(View.GONE);
                         filtersPanel.setAlpha(1f);
                     });
-                    btnToggleFilters.setCompoundDrawablesWithIntrinsicBounds(0, 0, R.drawable.ic_arrow_drop_down_24, 0);
                 } else {
                     filtersPanel.setAlpha(0f);
                     filtersPanel.setVisibility(View.VISIBLE);
                     filtersPanel.animate().alpha(1f).setDuration(200).start();
-                    btnToggleFilters.setCompoundDrawablesWithIntrinsicBounds(0, 0, R.drawable.ic_arrow_drop_up_24, 0);
                 }
             });
         }

@@ -4,61 +4,60 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="16dp"
+    android:padding="24dp"
+    android:background="@color/card_dark"
     app:behavior_peekHeight="0dp"
     app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
 
     <com.google.android.material.imageview.ShapeableImageView
         android:id="@+id/profileImage"
-        android:layout_width="120dp"
-        android:layout_height="120dp"
+        android:layout_width="96dp"
+        android:layout_height="96dp"
         android:layout_gravity="center_horizontal"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="8dp"
         android:layout_marginBottom="16dp"
         android:scaleType="centerCrop"
         android:src="@drawable/ic_account_circle_24"
-        app:shapeAppearanceOverlay="@style/CircleImageView"/>
+        app:shapeAppearanceOverlay="@style/CircleImageView" />
 
     <TextView
         android:id="@+id/emailText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="24dp"
         android:gravity="center"
         android:textSize="16sp"
-        android:textColor="?android:attr/textColorSecondary"/>
+        android:textColor="@color/text_secondary"
+        android:layout_marginBottom="24dp" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/connectAsanaButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="8dp"
-        android:text="Połącz konto z Asana"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+        android:layout_marginBottom="12dp"
+        android:text="Edycja profilu"
+        style="@style/FleeklyButton" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/connectTogglButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="8dp"
-        android:text="Połącz z Toggl"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+        android:layout_marginBottom="12dp"
+        android:text="Powiadomienia"
+        style="@style/FleeklyButton" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/changePasswordButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="8dp"
-        android:text="Zmień hasło"
-        android:textColor="@color/design_default_color_error"
-        style="@style/Widget.MaterialComponents.Button.TextButton"/>
+        android:layout_marginBottom="12dp"
+        android:text="Płatności"
+        style="@style/FleeklyButton" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/logoutButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"
-        android:text="Wyloguj się"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+        android:text="Wyloguj"
+        style="@style/FleeklyButton" />
 
 </LinearLayout> 

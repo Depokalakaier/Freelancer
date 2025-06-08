@@ -37,7 +37,7 @@ public class Invoice implements Parcelable {
         this.issueDate = new Date();
         this.dueDate = new Date(System.currentTimeMillis() + 14 * 24 * 60 * 60 * 1000); // +14 dni
         this.isPaid = false;
-        this.status = "DRAFT";
+        this.status = "UNPAID"; // Changed from DRAFT to UNPAID
         this.reminderSet = false;
         this.reminderDate = null;
         this.reminderNote = "";

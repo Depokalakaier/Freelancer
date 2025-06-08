@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
+import android.widget.TextView;
 
 public class HistoryFragment extends Fragment {
     private RecyclerView recyclerViewInvoices;
@@ -31,13 +32,8 @@ public class HistoryFragment extends Fragment {
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_history, container, false);
-        RecyclerView recyclerView = view.findViewById(R.id.recyclerViewHistory);
-        recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
-        List<SyncHistory> history = JsonLoader.loadHistoryFromAssets(getContext());
-        HistoryAdapter adapter = new HistoryAdapter(history);
-        recyclerView.setAdapter(adapter);
+        final TextView emptyText = view.findViewById(R.id.text_history_empty);
 
-        // Użyj RecyclerView z XML do faktur
         recyclerViewInvoices = view.findViewById(R.id.recyclerViewPaidInvoices);
         recyclerViewInvoices.setLayoutManager(new LinearLayoutManager(getContext()));
         invoiceAdapter = new InvoiceAdapter(paidInvoices, position -> {
@@ -49,7 +45,16 @@ public class HistoryFragment extends Fragment {
                 .commit();
         });
         recyclerViewInvoices.setAdapter(invoiceAdapter);
+
         loadPaidInvoices();
+        // Dodaj obsługę pustej listy po załadowaniu faktur
+        if (emptyText != null) {
+            if (paidInvoices.isEmpty()) {
+                emptyText.setVisibility(View.VISIBLE);
+            } else {
+                emptyText.setVisibility(View.GONE);
+            }
+        }
         return view;
     }
 
@@ -76,6 +81,18 @@ public class HistoryFragment extends Fragment {
                     }
                 }
                 invoiceAdapter.notifyDataSetChanged();
+                // Dodaj obsługę pustej listy po załadowaniu faktur
+                View view = getView();
+                if (view != null) {
+                    TextView emptyText = view.findViewById(R.id.text_history_empty);
+                    if (emptyText != null) {
+                        if (paidInvoices.isEmpty()) {
+                            emptyText.setVisibility(View.VISIBLE);
+                        } else {
+                            emptyText.setVisibility(View.GONE);
+                        }
+                    }
+                }
                 android.util.Log.d("HistoryFragment", "Liczba opłaconych faktur: " + paidInvoices.size());
             });
     }

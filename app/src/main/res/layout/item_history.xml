@@ -4,7 +4,8 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     card_view:cardElevation="4dp"
-    card_view:cardCornerRadius="8dp"
+    card_view:cardCornerRadius="12dp"
+    card_view:cardBackgroundColor="@color/card_dark"
     android:layout_margin="8dp">
 
     <LinearLayout
@@ -16,20 +17,23 @@
         <TextView android:id="@+id/history_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Opis"
+            android:textColor="@color/text_primary"
             android:textStyle="bold"
             android:textSize="16sp"/>
 
         <TextView android:id="@+id/history_date"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Data"
+            android:textColor="@color/accent_orange"
+            android:textSize="14sp"
             android:layout_marginTop="4dp"/>
 
         <TextView android:id="@+id/history_status"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Status"
+            android:textColor="@color/accent_green"
+            android:textStyle="bold"
+            android:textSize="14sp"
             android:layout_marginTop="4dp"/>
     </LinearLayout>
 </androidx.cardview.widget.CardView>

@@ -67,7 +67,7 @@ public class MainActivity extends AppCompatActivity {
     private FirebaseAuth auth;
     private FirebaseUser user;
     private FirebaseFirestore firestore;
-    private BottomNavigationView bottomNavigationView;
+    // private BottomNavigationView bottomNavigationView;
     private BottomSheetDialog profileBottomSheet;
     private ActivityResultLauncher<Intent> imagePickerLauncher;
 
@@ -83,7 +83,7 @@ public class MainActivity extends AppCompatActivity {
         setupToolbar();
 
         // Konfiguracja Bottom Navigation
-        setupBottomNavigation();
+        // setupBottomNavigation();
 
         // Inicjalizacja image picker
         setupImagePicker();
@@ -115,6 +115,73 @@ public class MainActivity extends AppCompatActivity {
             syncRequest
         );
         android.util.Log.i("SyncWorker", "Zarejestrowano cykliczną synchronizację co godzinę");
+
+        // Obsługa kliknięć w nowym dolnym pasku nawigacji
+        TextView navTasks = findViewById(R.id.nav_tasks);
+        TextView navInvoices = findViewById(R.id.nav_invoices);
+        TextView navHistory = findViewById(R.id.nav_history);
+        View navTasksUnderline = findViewById(R.id.nav_tasks_underline);
+        View navInvoicesUnderline = findViewById(R.id.nav_invoices_underline);
+        View navHistoryUnderline = findViewById(R.id.nav_history_underline);
+
+        // Domyślnie aktywna zakładka: Zadania
+        navTasks.setTextColor(getResources().getColor(R.color.nav_active));
+        navTasksUnderline.setVisibility(View.VISIBLE);
+        navInvoices.setTextColor(getResources().getColor(R.color.nav_inactive));
+        navInvoicesUnderline.setVisibility(View.GONE);
+        navHistory.setTextColor(getResources().getColor(R.color.nav_inactive));
+        navHistoryUnderline.setVisibility(View.GONE);
+
+        View.OnClickListener navListener = v -> {
+            int id = v.getId();
+            if (id == R.id.nav_tasks) {
+                getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, new com.example.freelancera.view.TaskListFragment())
+                    .commit();
+                navTasks.setTextColor(getResources().getColor(R.color.nav_active));
+                navTasksUnderline.setVisibility(View.VISIBLE);
+                navInvoices.setTextColor(getResources().getColor(R.color.nav_inactive));
+                navInvoicesUnderline.setVisibility(View.GONE);
+                navHistory.setTextColor(getResources().getColor(R.color.nav_inactive));
+                navHistoryUnderline.setVisibility(View.GONE);
+            } else if (id == R.id.nav_invoices) {
+                getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, new com.example.freelancera.view.InvoiceListFragment())
+                    .commit();
+                navTasks.setTextColor(getResources().getColor(R.color.nav_inactive));
+                navTasksUnderline.setVisibility(View.GONE);
+                navInvoices.setTextColor(getResources().getColor(R.color.nav_active));
+                navInvoicesUnderline.setVisibility(View.VISIBLE);
+                navHistory.setTextColor(getResources().getColor(R.color.nav_inactive));
+                navHistoryUnderline.setVisibility(View.GONE);
+            } else if (id == R.id.nav_history) {
+                getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_container, new com.example.freelancera.view.HistoryFragment())
+                    .commit();
+                navTasks.setTextColor(getResources().getColor(R.color.nav_inactive));
+                navTasksUnderline.setVisibility(View.GONE);
+                navInvoices.setTextColor(getResources().getColor(R.color.nav_inactive));
+                navInvoicesUnderline.setVisibility(View.GONE);
+                navHistory.setTextColor(getResources().getColor(R.color.nav_active));
+                navHistoryUnderline.setVisibility(View.VISIBLE);
+            }
+        };
+        navTasks.setOnClickListener(navListener);
+        navInvoices.setOnClickListener(navListener);
+        navHistory.setOnClickListener(navListener);
+
+        // Ustaw kolor status bar i navigation bar na ciemny szary
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            getWindow().setStatusBarColor(android.graphics.Color.parseColor("#161a1d"));
+            getWindow().setNavigationBarColor(android.graphics.Color.parseColor("#1a1e22"));
+        }
+
+        // Obsługa kliknięcia zębatki (settingsButton)
+        View settingsButton = findViewById(R.id.settingsButton);
+        settingsButton.setOnClickListener(v -> showProfileBottomSheet());
     }
 
     @Override
@@ -216,61 +283,6 @@ public class MainActivity extends AppCompatActivity {
                 toolbarTitle.setText("Fleekly");
                 toolbarTitle.setGravity(android.view.Gravity.START | android.view.Gravity.CENTER_VERTICAL);
             }
-
-            // Ikona profilu
-            ShapeableImageView profileIcon = toolbar.findViewById(R.id.profileIcon);
-            if (profileIcon != null) {
-                profileIcon.setOnClickListener(v -> showProfileBottomSheet());
-                // Załaduj zdjęcie profilowe jeśli istnieje, w przeciwnym razie domyślna ikona aplikacji
-                if (user != null && user.getPhotoUrl() != null) {
-                    Glide.with(this)
-                        .load(user.getPhotoUrl())
-                        .placeholder(R.mipmap.ic_launcher)
-                        .error(R.mipmap.ic_launcher)
-                        .into(profileIcon);
-                } else {
-                    profileIcon.setImageResource(R.mipmap.ic_launcher);
-                }
-            }
-        }
-    }
-
-    private void setupBottomNavigation() {
-        bottomNavigationView = findViewById(R.id.bottom_navigation);
-        if (bottomNavigationView != null) {
-            bottomNavigationView.setOnItemSelectedListener(item -> {
-                int itemId = item.getItemId();
-                if (itemId == R.id.navigation_tasks) {
-                    // Zawsze wstaw nowy TaskListFragment
-                    getSupportFragmentManager()
-                        .beginTransaction()
-                        .replace(R.id.fragment_container, new com.example.freelancera.view.TaskListFragment())
-                        .commit();
-                    // Odśwież zadania po krótkim opóźnieniu
-                    new android.os.Handler().postDelayed(() -> {
-                        androidx.fragment.app.Fragment current = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
-                        if (current instanceof com.example.freelancera.view.TaskListFragment) {
-                            ((com.example.freelancera.view.TaskListFragment) current).fetchAndSyncTasksFromAsana();
-                        }
-                    }, 500);
-                    return true;
-                } else if (itemId == R.id.navigation_invoices) {
-                    // Zakładka Faktury - dedykowany fragment
-                    getSupportFragmentManager()
-                        .beginTransaction()
-                        .replace(R.id.fragment_container, new com.example.freelancera.view.InvoiceListFragment())
-                        .commit();
-                    return true;
-                } else if (itemId == R.id.navigation_history) {
-                    // Zakładka Historia - poprawnie wstaw HistoryFragment
-                    getSupportFragmentManager()
-                        .beginTransaction()
-                        .replace(R.id.fragment_container, new com.example.freelancera.view.HistoryFragment())
-                        .commit();
-                    return true;
-                }
-                return false;
-            });
         }
     }
 
@@ -892,14 +904,6 @@ public class MainActivity extends AppCompatActivity {
                     userRef.update("photoUrl", uri.toString())
                         .addOnSuccessListener(unused -> {
                             Toast.makeText(MainActivity.this, "Zdjęcie profilowe zaktualizowane", Toast.LENGTH_SHORT).show();
-                            // Odśwież zdjęcie w toolbarze
-                            ShapeableImageView profileIcon = findViewById(R.id.profileIcon);
-                            Glide.with(this)
-                                .load(uri)
-                                .placeholder(R.mipmap.ic_launcher)
-                                .error(R.mipmap.ic_launcher)
-                                .circleCrop()
-                                .into(profileIcon);
                             // Odśwież bottom sheet
                             if (profileBottomSheet != null && profileBottomSheet.isShowing()) {
                                 profileBottomSheet.dismiss();

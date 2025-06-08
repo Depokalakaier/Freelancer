@@ -66,8 +66,7 @@ public class InvoiceAdapter extends RecyclerView.Adapter<InvoiceAdapter.InvoiceV
             int pos = holder.getAdapterPosition();
             if (pos == RecyclerView.NO_POSITION) return;
             Invoice inv = invoiceList.get(pos);
-            inv.setPaid(true);
-            inv.setStatus("PAID");
+            inv.markAsPaid();
             // Zaktualizuj w Firebase
             FirebaseFirestore firestore = FirebaseFirestore.getInstance();
             String uid = FirebaseAuth.getInstance().getCurrentUser() != null ? FirebaseAuth.getInstance().getCurrentUser().getUid() : null;

@@ -1,17 +1,22 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:orientation="vertical">
 
     <TextView
         android:id="@+id/text_invoices_header"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Faktury"
+        android:textColor="@color/text_primary"
+        android:textSize="22sp"
         android:textStyle="bold"
-        android:textSize="20sp"
-        android:gravity="center"
-        android:padding="12dp" />
+        android:fontFamily="sans-serif-medium"
+        android:paddingStart="16dp"
+        android:paddingTop="16dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="8dp" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler_invoices"
