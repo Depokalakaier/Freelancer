@@ -14,6 +14,12 @@ public class RateStorage {
     private static final String PREFS_NAME = "project_rates";
     private static final String KEY_RATES = "rates";
 
+    private static String encodeProjectName(String projectName) {
+        if (projectName == null) return null;
+        // Replace forward slashes and other problematic characters with underscores
+        return projectName.replaceAll("[/\\\\]", "_");
+    }
+
     public static void saveProjectRate(Context context, String projectName, double rate) {
         if (context == null || projectName == null || projectName.isEmpty()) return;
 
@@ -34,11 +40,14 @@ public class RateStorage {
                 rateData.put("rate", rate);
                 rateData.put("lastModified", System.currentTimeMillis());
 
+                // Use encoded project name for Firestore document ID
+                String encodedProjectName = encodeProjectName(projectName);
+
                 FirebaseFirestore.getInstance()
                     .collection("users")
                     .document(user.getUid())
                     .collection("project_rates")
-                    .document(projectName)
+                    .document(encodedProjectName)
                     .set(rateData)
                     .addOnSuccessListener(aVoid -> Log.d("RateStorage", "Zapisano stawkę w Firestore dla " + projectName))
                     .addOnFailureListener(e -> Log.e("RateStorage", "Błąd zapisu stawki w Firestore dla " + projectName, e));
@@ -77,11 +86,14 @@ public class RateStorage {
             return;
         }
 
+        // Use encoded project name for Firestore document ID
+        String encodedProjectName = encodeProjectName(projectName);
+
         FirebaseFirestore.getInstance()
             .collection("users")
             .document(user.getUid())
             .collection("project_rates")
-            .document(projectName)
+            .document(encodedProjectName)
             .get()
             .addOnSuccessListener(documentSnapshot -> {
                 if (documentSnapshot.exists()) {
