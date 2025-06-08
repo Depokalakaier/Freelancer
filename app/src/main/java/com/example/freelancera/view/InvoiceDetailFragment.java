@@ -8,7 +8,6 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 import com.example.freelancera.R;
 import com.example.freelancera.models.Invoice;
-import com.example.freelancera.util.JsonLoader;
 import android.os.Build;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;

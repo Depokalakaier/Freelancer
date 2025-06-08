@@ -12,7 +12,6 @@ import com.example.freelancera.adapter.HistoryAdapter;
 import com.example.freelancera.adapter.InvoiceAdapter;
 import com.example.freelancera.model.SyncHistory;
 import com.example.freelancera.models.Invoice;
-import com.example.freelancera.util.JsonLoader;
 import java.util.List;
 import java.util.ArrayList;
 import com.google.firebase.auth.FirebaseAuth;
