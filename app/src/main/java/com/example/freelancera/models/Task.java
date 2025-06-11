@@ -55,6 +55,9 @@ public class Task implements Parcelable {
     private Date completedAt;
     // Dodaję pole context (jeśli nie ma)
     private transient android.content.Context context;
+    private String formattedTotalTime;
+    private String formattedAmount;
+    private String completedStatus;
 
     public Task() {
         // Required empty constructor for Firestore
@@ -382,15 +385,14 @@ public class Task implements Parcelable {
         }
     }
 
-    public String getFormattedTotalTime() {
-        long hours = totalTimeInSeconds / 3600;
-        long minutes = (totalTimeInSeconds % 3600) / 60;
-        return String.format(Locale.getDefault(), "%02d:%02d", hours, minutes);
-    }
+    public String getFormattedTotalTime() { return formattedTotalTime; }
+    public void setFormattedTotalTime(String formattedTotalTime) { this.formattedTotalTime = formattedTotalTime; }
 
-    public String getFormattedAmount() {
-        return String.format(Locale.getDefault(), "%.2f %s", totalAmount, currency);
-    }
+    public String getFormattedAmount() { return formattedAmount; }
+    public void setFormattedAmount(String formattedAmount) { this.formattedAmount = formattedAmount; }
+
+    public String getCompletedStatus() { return completedStatus; }
+    public void setCompletedStatus(String completedStatus) { this.completedStatus = completedStatus; }
 
     public void updateTogglData(Context context, long trackedSeconds, String projectName, String clientName) {
         this.togglTrackedSeconds = trackedSeconds;

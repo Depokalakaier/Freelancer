@@ -61,6 +61,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import com.example.freelancera.util.CalendarUtils;
 import android.widget.Button;
+import com.example.freelancera.util.SyncWorker;
 
 /**
  * TaskListFragment - fragment wyświetlający listę zadań użytkownika.
@@ -140,7 +141,7 @@ public class TaskListFragment extends Fragment {
         // Ładuj zadania z lokalnego storage
         allTasks.clear();
         allTasks.addAll(Task.loadTasks(getContext()));
-        filterAndSortTasks();
+        filterOutPaidCompletedTasks();
 
         // Obsługa wyszukiwania
         if (searchEditText != null) {
@@ -149,7 +150,7 @@ public class TaskListFragment extends Fragment {
                 public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
                 @Override
                 public void onTextChanged(CharSequence s, int start, int before, int count) {
-                    filterAndSortTasks();
+                    filterOutPaidCompletedTasks();
                 }
                 @Override
                 public void afterTextChanged(android.text.Editable s) {}
@@ -178,10 +179,10 @@ public class TaskListFragment extends Fragment {
     public void onViewCreated(View view, Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         taskStorage = new TaskStorage(requireContext());
-        
-        // Automatyczne odświeżanie przy starcie
         swipeRefreshLayout.setRefreshing(true);
-        fetchAndSyncTasksFromAsana();
+        allTasks.clear();
+        allTasks.addAll(Task.loadTasks(getContext()));
+        filterOutPaidCompletedTasks();
         if (getActivity() instanceof com.example.freelancera.MainActivity) {
             ((com.example.freelancera.MainActivity) getActivity()).syncTogglData();
         }
@@ -212,15 +213,22 @@ public class TaskListFragment extends Fragment {
                 }
                 adapter.updateTasks(allTasks);
                 swipeRefreshLayout.setRefreshing(false);
+                // Dodaj sprawdzanie przypomnień o fakturach
+                if (user != null && getContext() != null) {
+                    SyncWorker.checkAndAddInvoiceReminders(getContext(), user.getUid());
+                }
             })
             .addOnFailureListener(e -> {
                 Toast.makeText(getContext(), "Błąd podczas ładowania zadań: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 swipeRefreshLayout.setRefreshing(false);
-                
                 // Load from local storage on failure
                 allTasks.clear();
                 allTasks.addAll(Task.loadTasks(getContext()));
                 adapter.updateTasks(allTasks);
+                // Dodaj sprawdzanie przypomnień o fakturach
+                if (user != null && getContext() != null) {
+                    SyncWorker.checkAndAddInvoiceReminders(getContext(), user.getUid());
+                }
             });
     }
 
@@ -258,12 +266,20 @@ public class TaskListFragment extends Fragment {
                         swipeRefreshLayout.setRefreshing(false);
                         Toast.makeText(getContext(), "Brak tokenu Asany. Połącz konto w ustawieniach.", Toast.LENGTH_LONG).show();
                         loadTasksFromFirestore(user.getUid());
+                        // Dodaj sprawdzanie przypomnień o fakturach
+                        if (user != null && getContext() != null) {
+                            SyncWorker.checkAndAddInvoiceReminders(getContext(), user.getUid());
+                        }
                     }
                 } else {
                     Log.e(TAG, "fetchAndSyncTasksFromAsana: user document doesn't exist");
                     swipeRefreshLayout.setRefreshing(false);
                     Toast.makeText(getContext(), "Błąd: Nie znaleziono dokumentu użytkownika", Toast.LENGTH_LONG).show();
                     loadTasksFromFirestore(user.getUid());
+                    // Dodaj sprawdzanie przypomnień o fakturach
+                    if (user != null && getContext() != null) {
+                        SyncWorker.checkAndAddInvoiceReminders(getContext(), user.getUid());
+                    }
                 }
             })
             .addOnFailureListener(e -> {
@@ -271,8 +287,11 @@ public class TaskListFragment extends Fragment {
                 swipeRefreshLayout.setRefreshing(false);
                 Toast.makeText(getContext(), "Błąd przy pobieraniu tokenu: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 loadTasksFromFirestore(user.getUid());
+                // Dodaj sprawdzanie przypomnień o fakturach
+                if (user != null && getContext() != null) {
+                    SyncWorker.checkAndAddInvoiceReminders(getContext(), user.getUid());
+                }
             });
-
         // Po zakończeniu synchronizacji, nadpisz całą lokalną bazę zadań
         taskStorage.clearAllTasks();
         for (Task task : allTasks) {
@@ -592,11 +611,12 @@ public class TaskListFragment extends Fragment {
                         if (togglToken == null || togglToken.isEmpty()) {
                             if (!isAdded() || getContext() == null) return;
                             requireActivity().runOnUiThread(() -> {
-                                filterAndSortTasks();
+                                filterOutPaidCompletedTasks();
                                 swipeRefreshLayout.setRefreshing(false);
                             });
                             return;
                         }
+                        // Pobierz workspaceId z API Toggl
                         OkHttpClient client = new OkHttpClient();
                         String auth = okhttp3.Credentials.basic(togglToken, "api_token");
                         Request meReq = new Request.Builder()
@@ -606,18 +626,16 @@ public class TaskListFragment extends Fragment {
                         client.newCall(meReq).enqueue(new okhttp3.Callback() {
                             @Override
                             public void onFailure(okhttp3.Call call, IOException e) {
-                                if (!isAdded() || getContext() == null) return;
                                 requireActivity().runOnUiThread(() -> {
-                                    filterAndSortTasks();
+                                    filterOutPaidCompletedTasks();
                                     swipeRefreshLayout.setRefreshing(false);
                                 });
                             }
                             @Override
                             public void onResponse(okhttp3.Call call, okhttp3.Response response) throws IOException {
-                                if (!isAdded() || getContext() == null) return;
                                 if (!response.isSuccessful()) {
                                     requireActivity().runOnUiThread(() -> {
-                                        filterAndSortTasks();
+                                        filterOutPaidCompletedTasks();
                                         swipeRefreshLayout.setRefreshing(false);
                                     });
                                     return;
@@ -626,128 +644,31 @@ public class TaskListFragment extends Fragment {
                                 try {
                                     org.json.JSONObject me = new org.json.JSONObject(body);
                                     long workspaceId = me.getLong("default_workspace_id");
-                                    String projectsUrl = "https://api.track.toggl.com/api/v9/workspaces/" + workspaceId + "/projects";
-                                    Request projectsReq = new Request.Builder()
-                                            .url(projectsUrl)
-                                            .addHeader("Authorization", auth)
-                                            .build();
-                                    client.newCall(projectsReq).enqueue(new okhttp3.Callback() {
-                                        @Override
-                                        public void onFailure(okhttp3.Call call, IOException e) {
-                                            if (!isAdded() || getContext() == null) return;
-                                            requireActivity().runOnUiThread(() -> {
-                                                filterAndSortTasks();
-                                                swipeRefreshLayout.setRefreshing(false);
-                                            });
-                                        }
-                                        @Override
-                                        public void onResponse(okhttp3.Call call, okhttp3.Response response) throws IOException {
-                                            if (!isAdded() || getContext() == null) return;
-                                            if (!response.isSuccessful()) {
-                                                requireActivity().runOnUiThread(() -> {
-                                                    filterAndSortTasks();
-                                                    swipeRefreshLayout.setRefreshing(false);
-                                                });
-                                                return;
-                                            }
-                                            String projectsBody = response.body().string();
-                                            try {
-                                                // Sprawdź czy odpowiedź to tablica czy obiekt
-                                                if (projectsBody.trim().startsWith("{")) {
-                                                    org.json.JSONObject json = new org.json.JSONObject(projectsBody);
-                                                    if (!json.has("data")) {
-                                                        Log.e(TAG, "[TOGGL] Brak pola 'data' w odpowiedzi: " + projectsBody);
-                                                        requireActivity().runOnUiThread(() -> {
-                                                            Toast.makeText(getContext(), "Błąd: Brak projektów lub nieprawidłowa odpowiedź API", Toast.LENGTH_LONG).show();
-                                                            filterAndSortTasks();
-                                                            swipeRefreshLayout.setRefreshing(false);
-                                                        });
-                                                        return;
+                                    // Teraz pobierz projekty z Firestore
+                                    firestore.collection("users").document(uid)
+                                        .collection("toggl_projects").document(String.valueOf(workspaceId))
+                                        .collection("projects")
+                                        .get()
+                                        .addOnSuccessListener(querySnapshot -> {
+                                            List<org.json.JSONObject> togglProjects = new ArrayList<>();
+                                            for (com.google.firebase.firestore.DocumentSnapshot doc : querySnapshot.getDocuments()) {
+                                                togglProjects.add(new org.json.JSONObject(doc.getData()));
                                                     }
-                                                    org.json.JSONArray projects = json.getJSONArray("data");
-                                                    // 3. Pobierz klientów
-                                                    String clientsUrl = "https://api.track.toggl.com/api/v9/workspaces/" + workspaceId + "/clients";
-                                                    Request clientsReq = new Request.Builder()
-                                                            .url(clientsUrl)
-                                                            .addHeader("Authorization", auth)
-                                                            .build();
-                                                    client.newCall(clientsReq).enqueue(new okhttp3.Callback() {
-                                                        @Override
-                                                        public void onFailure(okhttp3.Call call, IOException e) {
-                                                            Log.e(TAG, "[TOGGL] Błąd pobierania klientów: " + e.getMessage());
-                                                            mergeAsanaWithTogglProjects(projects, null, uid);
-                                                        }
-
-                                                        @Override
-                                                        public void onResponse(okhttp3.Call call, okhttp3.Response response) throws IOException {
-                                                            org.json.JSONArray clients = null;
-                                                            if (response.isSuccessful()) {
-                                                                try {
-                                                                    String clientsBody = response.body().string();
-                                                                    clients = new org.json.JSONArray(clientsBody);
+                                            org.json.JSONArray togglProjectsArray = new org.json.JSONArray(togglProjects);
+                                            mergeAsanaWithTogglProjects(togglProjectsArray, null, uid);
+                                        })
+                                        .addOnFailureListener(e -> {
+                                            Log.e(TAG, "Błąd pobierania projektów z Firestore: " + e.getMessage(), e);
+                                            mergeAsanaWithTogglProjects(new org.json.JSONArray(), null, uid);
+                                        });
                                                                 } catch (Exception e) {
-                                                                    Log.e(TAG, "[TOGGL] Błąd parsowania klientów: " + e.getMessage());
-                                                                }
-                                                            }
-                                                            mergeAsanaWithTogglProjects(projects, clients, uid);
-                                                        }
-                                                    });
-                                                } else if (projectsBody.trim().startsWith("[")) {
-                                                    org.json.JSONArray projects = new org.json.JSONArray(projectsBody);
-                                                    // 3. Pobierz klientów
-                                                    String clientsUrl = "https://api.track.toggl.com/api/v9/workspaces/" + workspaceId + "/clients";
-                                                    Request clientsReq = new Request.Builder()
-                                                            .url(clientsUrl)
-                                                            .addHeader("Authorization", auth)
-                                                            .build();
-                                                    client.newCall(clientsReq).enqueue(new okhttp3.Callback() {
-                                                        @Override
-                                                        public void onFailure(okhttp3.Call call, IOException e) {
-                                                            Log.e(TAG, "[TOGGL] Błąd pobierania klientów: " + e.getMessage());
-                                                            mergeAsanaWithTogglProjects(projects, null, uid);
-                                                        }
-                                                        @Override
-                                                        public void onResponse(okhttp3.Call call, okhttp3.Response response) throws IOException {
-                                                            org.json.JSONArray clients = null;
-                                                            if (response.isSuccessful()) {
-                                                                try {
-                                                                    String clientsBody = response.body().string();
-                                                                    clients = new org.json.JSONArray(clientsBody);
-                                                                } catch (Exception e) {
-                                                                    Log.e(TAG, "[TOGGL] Błąd parsowania klientów: " + e.getMessage());
-                                                                }
-                                                            }
-                                                            mergeAsanaWithTogglProjects(projects, clients, uid);
-                                                        }
-                                                    });
-                                                } else {
-                                                    Log.e(TAG, "[TOGGL] Nieoczekiwany format odpowiedzi: " + projectsBody);
                                                     requireActivity().runOnUiThread(() -> {
-                                                        Toast.makeText(getContext(), "Błąd: Nieoczekiwany format odpowiedzi z API", Toast.LENGTH_LONG).show();
-                                                        filterAndSortTasks();
+                                        filterOutPaidCompletedTasks();
                                                         swipeRefreshLayout.setRefreshing(false);
                                                     });
-                                                    return;
-                                                }
-                                            } catch (Exception e) {
-                                                Log.e(TAG, "Błąd parsowania projektów: " + e.getMessage() + " | Odpowiedź: " + projectsBody, e);
-                                                requireActivity().runOnUiThread(() -> {
-                                                    Toast.makeText(getContext(), "Błąd parsowania projektów: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                    filterAndSortTasks();
-                    swipeRefreshLayout.setRefreshing(false);
-                                                });
                                             }
                                         }
                                     });
-                                } catch (Exception e) {
-                                    Log.e(TAG, "[TOGGL] Błąd parsowania me: " + e.getMessage(), e);
-                                    requireActivity().runOnUiThread(() -> {
-                                        filterAndSortTasks();
-                                        swipeRefreshLayout.setRefreshing(false);
-                                    });
-                                }
-                            }
-                        });
                     });
                 });
     }
@@ -759,24 +680,32 @@ public class TaskListFragment extends Fragment {
                 for (int p = 0; p < projects.length(); p++) {
                     org.json.JSONObject proj = projects.getJSONObject(p);
                     String togglProjectName = proj.optString("name", null);
-                    if (togglProjectName != null && togglProjectName.equalsIgnoreCase(task.getName())) {
-                        // Uzupełnij klienta z projektu Toggl
-                        String togglClientName = null;
+                    String togglProjectId = proj.optString("id", null);
+                    String togglClientName = proj.optString("client_name", null);
                         String clientId = proj.optString("client_id", null);
-                        if ((proj.has("client_name") && !proj.isNull("client_name"))) {
-                            togglClientName = proj.optString("client_name");
-                        } else if (clientId != null && clients != null) {
-                            for (int c = 0; c < clients.length(); c++) {
-                                org.json.JSONObject cl = clients.getJSONObject(c);
-                                if (cl.optString("id").equals(clientId)) {
-                                    togglClientName = cl.optString("name", null);
-                                    break;
+                    boolean match = false;
+                    // Dopasowanie po nazwie
+                    if (togglProjectName != null && togglProjectName.equalsIgnoreCase(task.getName())) {
+                        match = true;
+                    }
+                    // Dopasowanie po ID projektu
+                    if (task.getTogglProjectId() != null && togglProjectId != null &&
+                        task.getTogglProjectId().equals(togglProjectId)) {
+                        match = true;
+                    }
+                    // Dopasowanie po nazwie klienta
+                    if (togglClientName != null && togglClientName.equalsIgnoreCase(task.getClient())) {
+                        match = true;
                                 }
-                            }
-                        }
+                    if (match) {
+                        // Uzupełnij klienta z projektu Toggl
                         if (togglClientName != null && !togglClientName.isEmpty()) {
                             task.setTogglClientName(togglClientName);
                             task.setClient(togglClientName);
+                        }
+                        // Ustaw togglProjectId na id projektu z Toggl
+                        if (togglProjectId != null) {
+                            task.setTogglProjectId(togglProjectId);
                         }
                         // Uzupełnij czas z actual_seconds (jeśli jest)
                         long actualSeconds = proj.optLong("actual_seconds", 0);
@@ -803,7 +732,7 @@ public class TaskListFragment extends Fragment {
         // ZABEZPIECZENIE przed wywołaniem na niepodpiętym fragmencie
         if (!isAdded() || getActivity() == null) return;
         requireActivity().runOnUiThread(() -> {
-            filterAndSortTasks();
+            filterOutPaidCompletedTasks();
                     swipeRefreshLayout.setRefreshing(false);
                 });
     }
@@ -818,7 +747,7 @@ public class TaskListFragment extends Fragment {
         }
 
         // Sort tasks based on current sort settings
-        filterAndSortTasks();
+        filterOutPaidCompletedTasks();
     }
 
     private void handleCompletedTask(Task task) {
@@ -953,63 +882,86 @@ public class TaskListFragment extends Fragment {
             } else if (checkedId == R.id.chip_due) {
                 currentStatus = "Termin";
             }
-            filterAndSortTasks();
+            filterOutPaidCompletedTasks();
         });
     }
 
-    private void filterAndSortTasks() {
-        List<Task> filteredTasks = new ArrayList<>(allTasks);
-
-        // 1. Filtrowanie po statusie
-        if (!currentStatus.equals("all")) {
-            filteredTasks.removeIf(task -> !currentStatus.equals(task.getStatus()));
+    private void filterOutPaidCompletedTasks() {
+        FirebaseFirestore firestore = FirebaseFirestore.getInstance();
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user != null) {
+            firestore.collection("users").document(user.getUid())
+                .collection("invoices")
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    List<String> paidTaskIds = new ArrayList<>();
+                    for (com.google.firebase.firestore.DocumentSnapshot doc : querySnapshot.getDocuments()) {
+                        String status = doc.getString("status");
+                        String taskId = doc.getString("taskId");
+                        if ("PAID".equalsIgnoreCase(status) && taskId != null) {
+                            paidTaskIds.add(taskId);
+                        }
+                    }
+                    List<Task> filtered = new ArrayList<>();
+                    for (Task t : allTasks) {
+                        // UKRYJ tylko te zadania, które są ukończone i mają powiązaną fakturę PAID
+                        if (!(t.isCompletedStatus() && paidTaskIds.contains(t.getId()))) {
+                            filtered.add(t);
         }
-
-        // 2. Filtrowanie po wyszukiwaniu
-        if (searchEditText != null && !searchEditText.getText().toString().isEmpty()) {
-            String query = searchEditText.getText().toString().toLowerCase();
-            filteredTasks.removeIf(task -> 
-                task.getName() == null || !task.getName().toLowerCase().contains(query));
-        }
-
-        // 3. Sortowanie:
-        Collections.sort(filteredTasks, (task1, task2) -> {
-            // Ukończone zadania zawsze na końcu
-            if (task1.isCompletedStatus() && !task2.isCompletedStatus()) {
-                return 1;
-            }
-            if (!task1.isCompletedStatus() && task2.isCompletedStatus()) {
-                return -1;
-            }
-            
-            // Sortowanie po terminie (jeśli oba zadania mają termin)
-            if (task1.getDueDate() != null && task2.getDueDate() != null) {
-                return task1.getDueDate().compareTo(task2.getDueDate());
-            }
-            
-            // Zadania z terminem przed zadaniami bez terminu
-            if (task1.getDueDate() != null && task2.getDueDate() == null) {
-                return -1;
-            }
-            if (task1.getDueDate() == null && task2.getDueDate() != null) {
-                return 1;
-            }
-            
-            // Jeśli brak terminów, sortuj po dacie utworzenia (nowsze pierwsze)
-            if (task1.getCreatedAt() != null && task2.getCreatedAt() != null) {
-                return task2.getCreatedAt().compareTo(task1.getCreatedAt());
-            }
-            
+                    }
+                    // Sortowanie i aktualizacja adaptera
+                    filtered.sort((t1, t2) -> {
+                        String s1 = getTaskStatusForFilter(t1);
+                        String s2 = getTaskStatusForFilter(t2);
+                        boolean t1Completed = t1.isCompletedStatus();
+                        boolean t2Completed = t2.isCompletedStatus();
+                        if ("Ukończone".equals(currentStatus)) {
+                            if (t1Completed && !t2Completed) return -1;
+                            if (!t1Completed && t2Completed) return 1;
+                        } else {
+                            if (t1Completed && !t2Completed) return 1;
+                            if (!t1Completed && t2Completed) return -1;
+                        }
+                        if (currentStatus.equals(s1) && !currentStatus.equals(s2)) return -1;
+                        if (!currentStatus.equals(s1) && currentStatus.equals(s2)) return 1;
+                        if (t1.getDueDate() != null && t2.getDueDate() != null) {
+                            return t1.getDueDate().compareTo(t2.getDueDate());
+                        }
+                        if (t1.getDueDate() != null) return -1;
+                        if (t2.getDueDate() != null) return 1;
             return 0;
         });
-
-        // 4. Aktualizacja adaptera na głównym wątku
         if (getActivity() != null) {
             getActivity().runOnUiThread(() -> {
-        adapter.updateTasks(filteredTasks);
+                            adapter.updateTasks(filtered);
                 swipeRefreshLayout.setRefreshing(false);
             });
         }
+                })
+                .addOnFailureListener(e -> {
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            adapter.updateTasks(allTasks);
+                            swipeRefreshLayout.setRefreshing(false);
+                        });
+                    }
+                });
+        }
+    }
+
+    // Pomocnicza metoda do filtrowania statusów zgodnie z logiką adaptera
+    private String getTaskStatusForFilter(Task task) {
+        if (task.isCompletedStatus()) return "Ukończone";
+        if (task.getDueDate() != null) {
+            java.util.Calendar calDue = java.util.Calendar.getInstance();
+            calDue.setTime(task.getDueDate());
+            java.util.Calendar calToday = java.util.Calendar.getInstance();
+            boolean isDueToday = calDue.get(java.util.Calendar.YEAR) == calToday.get(java.util.Calendar.YEAR)
+                    && calDue.get(java.util.Calendar.DAY_OF_YEAR) == calToday.get(java.util.Calendar.DAY_OF_YEAR);
+            if (isDueToday) return "Nowe";
+            else return "W toku";
+        }
+        return task.getStatus();
     }
 
     private void onTaskClick(Task task) {

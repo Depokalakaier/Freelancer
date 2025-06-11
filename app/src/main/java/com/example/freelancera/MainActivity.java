@@ -846,13 +846,41 @@ public class MainActivity extends AppCompatActivity {
                                 if (data.containsKey("client_name")) {
                                     Log.d(TAG, "[TOGGL] Zapis klienta: " + data.get("client_name"));
                                 }
-                                Log.d(TAG, "[TOGGL] Dane do zapisu (project): workspace_id=" + wsId + ", project_id=" + innerProjectId + ", data=" + data.toString());
+                                // DODANE: Pobierz sumę duration z toggl_time_entries i dodaj do projektu
+                                firestore.collection("users").document(user.getUid())
+                                    .collection("toggl_time_entries")
+                                    .whereEqualTo("project_id", Long.parseLong(innerProjectId))
+                                    .get()
+                                    .addOnSuccessListener(timeEntriesSnapshot -> {
+                                        long totalSeconds = 0;
+                                        for (com.google.firebase.firestore.DocumentSnapshot timeDoc : timeEntriesSnapshot.getDocuments()) {
+                                            Long duration = timeDoc.getLong("duration");
+                                            if (duration != null && duration > 0) {
+                                                totalSeconds += duration;
+                                            }
+                                            // Obsługa trwających wpisów (duration < 0) - opcjonalnie
+                                        }
+                                        double hours = totalSeconds / 3600.0;
+                                        data.put("actual_seconds", totalSeconds);
+                                        data.put("actual_hours", hours);
+                                        Log.d(TAG, "[TOGGL] Dodano actual_seconds=" + totalSeconds + ", actual_hours=" + hours + " do projektu " + innerProjectId);
                                 firestore.collection("users").document(user.getUid())
                                         .collection("toggl_projects").document(wsId)
                                         .collection("projects").document(innerProjectId)
                                         .set(data)
                                         .addOnSuccessListener(unused -> Log.d(TAG, "[TOGGL] Zapisano projekt: workspace_id=" + wsId + ", project_id=" + innerProjectId + " (" + data.getOrDefault("name", "brak nazwy") + ")"))
                                         .addOnFailureListener(e -> Log.e(TAG, "[TOGGL] Błąd zapisu projektu: " + e.getMessage(), e));
+                                    })
+                                    .addOnFailureListener(e -> {
+                                        Log.e(TAG, "[TOGGL] Błąd pobierania wpisów time_entries dla projektu " + innerProjectId + ": " + e.getMessage(), e);
+                                        // Zapisz projekt bez actual_seconds/actual_hours
+                                        firestore.collection("users").document(user.getUid())
+                                            .collection("toggl_projects").document(wsId)
+                                            .collection("projects").document(innerProjectId)
+                                            .set(data)
+                                            .addOnSuccessListener(unused -> Log.d(TAG, "[TOGGL] Zapisano projekt (bez czasu): workspace_id=" + wsId + ", project_id=" + innerProjectId + " (" + data.getOrDefault("name", "brak nazwy") + ")"))
+                                            .addOnFailureListener(e2 -> Log.e(TAG, "[TOGGL] Błąd zapisu projektu: " + e2.getMessage(), e2));
+                                    });
                     } else {
                                 Log.w(TAG, "[TOGGL] Pominięto projekt bez workspace_id lub id: " + innerProject.toString());
                             }

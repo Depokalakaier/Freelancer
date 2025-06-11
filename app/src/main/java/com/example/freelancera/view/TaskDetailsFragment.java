@@ -264,16 +264,8 @@ public class TaskDetailsFragment extends BottomSheetDialogFragment {
         if (task.getDueDate() != null) {
             SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy", Locale.getDefault());
             String dateStr = sdf.format(task.getDueDate());
-            
-            long daysOverdue = (System.currentTimeMillis() - task.getDueDate().getTime()) / (24 * 60 * 60 * 1000);
-            if (daysOverdue > 0) {
-                dueDateText.setText(String.format(Locale.getDefault(), 
-                    "%d dni po terminie (%s)", daysOverdue, dateStr));
-                dueDateText.setTextColor(requireContext().getColor(android.R.color.holo_red_dark));
-            } else {
-                dueDateText.setText("Termin: " + dateStr);
-                dueDateText.setTextColor(requireContext().getColor(R.color.gray));
-            }
+            dueDateText.setText("Termin: " + dateStr);
+            dueDateText.setTextColor(requireContext().getColor(R.color.gray));
         }
 
         long seconds = task.getTogglTrackedSeconds() > 0 ? task.getTogglTrackedSeconds() : task.getTotalTimeInSeconds();

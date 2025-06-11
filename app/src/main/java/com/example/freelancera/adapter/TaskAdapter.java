@@ -81,6 +81,19 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
         }
     }
 
+    private static double roundHours(double rawHours) {
+        int wholeHours = (int) rawHours;
+        double minutesPart = (rawHours - wholeHours) * 60;
+        int minutes = (int) minutesPart;
+        if (minutes >= 0 && minutes <= 15) {
+            return wholeHours;
+        } else if (minutes >= 16 && minutes <= 44) {
+            return wholeHours + 0.5;
+        } else {
+            return wholeHours + 1;
+        }
+    }
+
     static class TaskViewHolder extends RecyclerView.ViewHolder {
         private static final String TAG = "TaskAdapter";
         private final MaterialCardView cardView;
@@ -108,18 +121,24 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
 
         void bind(Task task, OnTaskClickListener listener) {
             titleText.setText(task.getName());
-            String status = task.getStatus();
-            
+            String status;
             if (task.isCompletedStatus()) {
-                if (task.getCompletedAt() != null) {
-                    java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd.MM.yyyy", java.util.Locale.getDefault());
-                    statusText.setText("Ukończono " + sdf.format(task.getCompletedAt()));
+                status = "Ukończone";
+            } else if (task.getDueDate() != null) {
+                java.util.Calendar calDue = java.util.Calendar.getInstance();
+                calDue.setTime(task.getDueDate());
+                java.util.Calendar calToday = java.util.Calendar.getInstance();
+                boolean isDueToday = calDue.get(java.util.Calendar.YEAR) == calToday.get(java.util.Calendar.YEAR)
+                        && calDue.get(java.util.Calendar.DAY_OF_YEAR) == calToday.get(java.util.Calendar.DAY_OF_YEAR);
+                if (isDueToday) {
+                    status = "Nowe";
                 } else {
-                    statusText.setText("Ukończono");
+                    status = "W toku";
                 }
             } else {
-                statusText.setText(task.getStatus());
+                status = task.getStatus(); // fallback
             }
+            statusText.setText(status);
             if (task.getDueDate() != null) {
                 java.util.Calendar calDue = java.util.Calendar.getInstance();
                 calDue.setTime(task.getDueDate());
@@ -127,9 +146,17 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
                 boolean isDueToday = calDue.get(java.util.Calendar.YEAR) == calToday.get(java.util.Calendar.YEAR)
                         && calDue.get(java.util.Calendar.DAY_OF_YEAR) == calToday.get(java.util.Calendar.DAY_OF_YEAR);
                 dueDateText.setVisibility(View.VISIBLE);
-                if (isDueToday) {
+                if (task.isCompletedStatus()) {
+                    long diffDays = (task.getCompletedAt() != null ? (task.getCompletedAt().getTime() - task.getDueDate().getTime()) : 0) / (1000 * 60 * 60 * 24);
+                    if (diffDays <= 0) {
+                        dueDateText.setText("Ukończono w terminie");
+                    } else {
+                        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd.MM.yyyy", java.util.Locale.getDefault());
+                        dueDateText.setText("Termin: " + sdf.format(task.getDueDate()));
+                    }
+                } else if (isDueToday) {
                     SpannableString span = new SpannableString("Termin do dzisiaj");
-                    span.setSpan(new ForegroundColorSpan(ContextCompat.getColor(itemView.getContext(), R.color.red)), 0, span.length(), 0);
+                    span.setSpan(new ForegroundColorSpan(ContextCompat.getColor(itemView.getContext(), R.color.date_orange)), 0, span.length(), 0);
                     span.setSpan(new RelativeSizeSpan(0.95f), 0, span.length(), 0);
                     dueDateText.setText(span);
                 } else {
@@ -167,15 +194,21 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
             }
             // Czas z Toggl jeśli jest
             long togglSec = task.getTogglTrackedSeconds();
+            double roundedHours;
             if (togglSec > 0) {
-                long hours = togglSec / 3600;
-                long minutes = (togglSec % 3600) / 60;
-                timeText.setText(String.format(Locale.getDefault(), "%02d:%02d", hours, minutes));
+                double rawHours = togglSec / 3600.0;
+                roundedHours = roundHours(rawHours);
             } else {
-            long hours = task.getTotalTimeInSeconds() / 3600;
-            long minutes = (task.getTotalTimeInSeconds() % 3600) / 60;
-            timeText.setText(String.format(Locale.getDefault(), "%02d:%02d", hours, minutes));
+                double rawHours = task.getTotalTimeInSeconds() / 3600.0;
+                roundedHours = roundHours(rawHours);
             }
+            String hoursText;
+            if (Math.abs(roundedHours - Math.round(roundedHours)) < 0.01) {
+                hoursText = String.format("%d h", (int) roundedHours);
+            } else {
+                hoursText = String.format("%.1f h", roundedHours).replace(".0", "").replace(".", ",");
+            }
+            timeText.setText(hoursText);
 
             // Format amount - Update to use the actual rate from task
             double rate = task.getRatePerHour();

@@ -55,10 +55,12 @@ public class InvoiceAdapter extends RecyclerView.Adapter<InvoiceAdapter.InvoiceV
 
         if (invoice.isPaid()) {
             holder.paidStatus.setText("Opłacona");
-            holder.paidStatus.setTextColor(Color.parseColor("#008800"));
+            holder.paidStatus.setTextColor(Color.parseColor("#A8E6A3"));
+            holder.status.setText("Zarchiwizowana");
         } else {
             holder.paidStatus.setText("Nieopłacona");
             holder.paidStatus.setTextColor(Color.parseColor("#cc0000"));
+            holder.status.setText("");
         }
 
         holder.paidButton.setVisibility(invoice.isPaid() ? View.GONE : View.VISIBLE);
