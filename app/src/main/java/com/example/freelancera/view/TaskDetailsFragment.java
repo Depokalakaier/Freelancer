@@ -94,9 +94,6 @@ public class TaskDetailsFragment extends BottomSheetDialogFragment {
             toolbar.setNavigationOnClickListener(v -> requireActivity().onBackPressed());
         }
 
-        // Setup click listeners
-        setupClickListeners();
-
         return view;
     }
 
@@ -105,99 +102,6 @@ public class TaskDetailsFragment extends BottomSheetDialogFragment {
         super.onViewCreated(view, savedInstanceState);
         loadTask();
         startPeriodicUpdates();
-    }
-
-    private void setupClickListeners() {
-        rateText.setOnClickListener(v -> showRateDialog());
-        clientText.setOnClickListener(v -> showClientDialog());
-        if (saveButton != null) {
-            saveButton.setOnClickListener(v -> saveChanges());
-        }
-    }
-
-    private void showRateDialog() {
-        if (task == null) return;
-
-        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(requireContext());
-        builder.setTitle("Podaj stawkę za godzinę (PLN)");
-
-        final android.widget.EditText input = new android.widget.EditText(requireContext());
-        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        input.setText(String.format(Locale.US, "%.2f", task.getRatePerHour()));
-        builder.setView(input);
-
-        builder.setPositiveButton("Zapisz", (dialog, which) -> {
-            try {
-                String value = input.getText().toString().trim().replace(",", ".");
-                if (!value.isEmpty()) {
-                    double rate = Double.parseDouble(value);
-                    if (rate >= 0) {
-                        updateRate(rate);
-                    } else {
-                        Toast.makeText(getContext(), "Stawka nie może być ujemna", Toast.LENGTH_SHORT).show();
-                    }
-                }
-            } catch (NumberFormatException e) {
-                Toast.makeText(getContext(), "Nieprawidłowy format liczby", Toast.LENGTH_SHORT).show();
-            }
-        });
-
-        builder.setNegativeButton("Anuluj", (dialog, which) -> dialog.cancel());
-        builder.show();
-    }
-
-    private void updateRate(double rate) {
-        if (task == null) return;
-
-        task.setRatePerHour(rate);
-        
-        // Save rate separately
-        if (task.getName() != null && !task.getName().isEmpty()) {
-            RateStorage.saveProjectRate(requireContext(), task.getName(), rate);
-        }
-        
-        // Update amount
-        long seconds = task.getTogglTrackedSeconds() > 0 ? task.getTogglTrackedSeconds() : task.getTotalTimeInSeconds();
-        double hours = seconds / 3600.0;
-        double amount = hours * rate;
-        task.setTotalAmount(amount);
-        
-        // Save task
-        taskStorage.saveTask(task);
-        
-        // Update UI
-        updateUI();
-        Toast.makeText(getContext(), "Zapisano stawkę", Toast.LENGTH_SHORT).show();
-    }
-
-    private void showClientDialog() {
-        if (task == null) return;
-
-        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(requireContext());
-        builder.setTitle("Dodaj klienta");
-        
-        final android.widget.EditText input = new android.widget.EditText(requireContext());
-        input.setText(task.getClient() != null && !task.getClient().equals("Brak klienta") ? task.getClient() : "");
-        builder.setView(input);
-        
-        builder.setPositiveButton("Zapisz", (dialog, which) -> {
-            String value = input.getText().toString().trim();
-            if (!value.isEmpty()) {
-                updateClient(value);
-            }
-        });
-        
-        builder.setNegativeButton("Anuluj", (dialog, which) -> dialog.cancel());
-        builder.show();
-    }
-
-    private void updateClient(String client) {
-        if (task == null) return;
-
-        task.setClient(client);
-        taskStorage.saveTask(task);
-        updateUI();
-        Toast.makeText(getContext(), "Zapisano klienta", Toast.LENGTH_SHORT).show();
     }
 
     private void loadTask() {

@@ -42,6 +42,75 @@
             android:textSize="14sp" />
     </LinearLayout>
 
+    <!-- Animowany komunikat i statusy połączeń -->
+    <LinearLayout
+        android:id="@+id/connection_status_panel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="8dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/typewriterStatusText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text=""
+            android:textSize="16sp"
+            android:textColor="#EDE2CA"
+            android:fontFamily="sans-serif-medium"/>
+
+        <ImageView
+            android:id="@+id/asanaStatusIcon"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginStart="8dp"
+            android:src="@drawable/ic_check_circle"
+            android:visibility="gone"/>
+        <ImageView
+            android:id="@+id/togglStatusIcon"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginStart="4dp"
+            android:src="@drawable/ic_check_circle"
+            android:visibility="gone"/>
+    </LinearLayout>
+
+    <!-- Dodatkowy komunikat o połączeniu z Asana lub Toggl -->
+    <LinearLayout
+        android:id="@+id/connection_approve_panel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="8dp"
+        android:visibility="gone">
+        <TextView
+            android:id="@+id/connectionApproveText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Połączono pomyślnie"
+            android:textColor="#A5D6A7"
+            android:textSize="15sp"
+            android:layout_marginTop="4dp"
+            android:layout_marginEnd="8dp"
+            android:fontFamily="sans-serif-medium"/>
+        <ImageView
+            android:id="@+id/connectionApproveIcon"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@drawable/ic_check_circle"
+            android:tint="#A5D6A7"
+            android:layout_marginTop="4dp"
+            android:visibility="visible"/>
+    </LinearLayout>
+
     <!-- Panel filtrowania -->
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
@@ -74,7 +143,11 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="Wyszukaj zadanie"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                app:boxBackgroundColor="#e3d7bc"
+                app:boxStrokeColor="#e3d7bc"
+                app:boxBackgroundMode="outline"
+                app:backgroundTint="#e3d7bc">
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/search_edit_text"
                     android:layout_width="match_parent"

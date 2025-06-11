@@ -84,6 +84,25 @@ public class InvoiceSyncHelper {
                         }
                         if (onInvoicesReady != null) onInvoicesReady.accept(invoices);
                         if (onComplete != null) onComplete.run();
+
+                        // Po zakończeniu synchronizacji faktur:
+                        firestore.collection("users").document(user.getUid())
+                            .collection("invoices")
+                            .get()
+                            .addOnSuccessListener(snapshot -> {
+                                for (com.google.firebase.firestore.DocumentSnapshot doc : snapshot.getDocuments()) {
+                                    String clientName = doc.getString("clientName");
+                                    double hours = doc.contains("hours") ? doc.getDouble("hours") : -1;
+                                    double ratePerHour = doc.contains("ratePerHour") ? doc.getDouble("ratePerHour") : -1;
+                                    double totalAmount = doc.contains("totalAmount") ? doc.getDouble("totalAmount") : -1;
+                                    if ("Brak klienta".equals(clientName)
+                                        && hours == 0
+                                        && ratePerHour == 0
+                                        && totalAmount == 0) {
+                                        doc.getReference().delete();
+                                    }
+                                }
+                            });
                     })
                     .addOnFailureListener(e -> {
                         if (onInvoicesReady != null) onInvoicesReady.accept(new ArrayList<>());

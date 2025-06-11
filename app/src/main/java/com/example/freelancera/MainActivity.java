@@ -234,7 +234,6 @@ public class MainActivity extends AppCompatActivity {
                             String msg = "Toggl API response: " + response.code() + " " + body;
                             Log.d(TAG, msg);
                             runOnUiThread(() -> {
-                                Toast.makeText(MainActivity.this, "Token: '" + finalToken + "'\nKod: " + response.code() + "\n" + body, Toast.LENGTH_LONG).show();
                                 if (response.isSuccessful()) {
                                     Toast.makeText(MainActivity.this, "Połączono z Toggl!", Toast.LENGTH_LONG).show();
                                 } else {

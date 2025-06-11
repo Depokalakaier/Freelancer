@@ -85,12 +85,9 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                        android:textSize="14sp"
+                            android:textSize="14sp"
                             android:textColor="#dfd4be"
-                            android:fontFamily="sans-serif-medium"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:background="?attr/selectableItemBackground"/>
+                            android:fontFamily="sans-serif-medium"/>
                         <TextView
                             android:id="@+id/text_task_due_date"
                             android:layout_width="wrap_content"

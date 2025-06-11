@@ -64,6 +64,8 @@ import android.widget.Button;
 import com.example.freelancera.util.SyncWorker;
 import com.example.freelancera.util.InvoiceSyncHelper;
 import java.util.function.Consumer;
+import android.os.Handler;
+import android.widget.ImageView;
 
 /**
  * TaskListFragment - fragment wyświetlający listę zadań użytkownika.
@@ -79,6 +81,13 @@ public class TaskListFragment extends Fragment {
     private TextInputEditText searchEditText;
     private LinearLayout filtersPanel;
     private Button filterButton;
+    private LinearLayout connectionStatusPanel;
+    private TextView typewriterStatusText;
+    private ImageView asanaStatusIcon;
+    private ImageView togglStatusIcon;
+    private LinearLayout connectionApprovePanel;
+    private TextView connectionApproveText;
+    private ImageView connectionApproveIcon;
 
     // Adapter
     private TaskAdapter adapter;
@@ -119,6 +128,13 @@ public class TaskListFragment extends Fragment {
         searchEditText = view.findViewById(R.id.search_edit_text);
         filtersPanel = view.findViewById(R.id.filters_panel);
         filterButton = view.findViewById(R.id.filterButton);
+        connectionStatusPanel = view.findViewById(R.id.connection_status_panel);
+        typewriterStatusText = view.findViewById(R.id.typewriterStatusText);
+        asanaStatusIcon = view.findViewById(R.id.asanaStatusIcon);
+        togglStatusIcon = view.findViewById(R.id.togglStatusIcon);
+        connectionApprovePanel = view.findViewById(R.id.connection_approve_panel);
+        connectionApproveText = view.findViewById(R.id.connectionApproveText);
+        connectionApproveIcon = view.findViewById(R.id.connectionApproveIcon);
 
         // Setup RecyclerView
         setupRecyclerView();
@@ -181,13 +197,69 @@ public class TaskListFragment extends Fragment {
     public void onViewCreated(View view, Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         taskStorage = new TaskStorage(requireContext());
-        swipeRefreshLayout.setRefreshing(true);
-        allTasks.clear();
-        allTasks.addAll(Task.loadTasks(getContext()));
-        filterOutPaidCompletedTasks();
-        if (getActivity() instanceof com.example.freelancera.MainActivity) {
-            ((com.example.freelancera.MainActivity) getActivity()).syncTogglData();
+        // Nowa logika sprawdzania połączeń
+        LinearLayout connectionStatusPanel = view.findViewById(R.id.connection_status_panel);
+        TextView typewriterStatusText = view.findViewById(R.id.typewriterStatusText);
+        ImageView asanaStatusIcon = view.findViewById(R.id.asanaStatusIcon);
+        ImageView togglStatusIcon = view.findViewById(R.id.togglStatusIcon);
+        RecyclerView recyclerView = view.findViewById(R.id.tasks_recycler_view);
+        filtersPanel = view.findViewById(R.id.filters_panel);
+        if (filtersPanel != null) {
+            filtersPanel.setVisibility(View.GONE);
         }
+
+        FirebaseFirestore firestore = FirebaseFirestore.getInstance();
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user == null) return;
+        firestore.collection("users").document(user.getUid()).get().addOnSuccessListener(document -> {
+            boolean asanaConnected = document.contains("asanaToken") && document.getString("asanaToken") != null && !document.getString("asanaToken").isEmpty();
+            boolean togglConnected = document.contains("togglToken") && document.getString("togglToken") != null && !document.getString("togglToken").isEmpty();
+            if (!asanaConnected && togglConnected) {
+                connectionStatusPanel.setVisibility(View.VISIBLE);
+                recyclerView.setVisibility(View.GONE);
+                filtersPanel.setVisibility(View.GONE);
+                asanaStatusIcon.setVisibility(View.GONE);
+                togglStatusIcon.setVisibility(View.GONE);
+                connectionApprovePanel.setVisibility(View.VISIBLE);
+                connectionApproveText.setText("Toggl połączono pomyślnie");
+                connectionApproveIcon.setImageResource(R.drawable.ic_check_circle);
+                startTypewriterAnimation(typewriterStatusText, "Połącz z Asana, aby wyświetlić zadania. Kliknij zębatkę w prawym górnym rogu.");
+            } else if (asanaConnected && !togglConnected) {
+                connectionStatusPanel.setVisibility(View.VISIBLE);
+                recyclerView.setVisibility(View.GONE);
+                filtersPanel.setVisibility(View.GONE);
+                asanaStatusIcon.setVisibility(View.GONE);
+                togglStatusIcon.setVisibility(View.GONE);
+                connectionApprovePanel.setVisibility(View.VISIBLE);
+                connectionApproveText.setText("Asana połączono pomyślnie");
+                connectionApproveIcon.setImageResource(R.drawable.ic_check_circle);
+                startTypewriterAnimation(typewriterStatusText, "Połącz z Toggl, aby zsynchronizować czas pracy. Kliknij zębatkę w prawym górnym rogu.");
+            } else if (!asanaConnected && !togglConnected) {
+                connectionStatusPanel.setVisibility(View.VISIBLE);
+                recyclerView.setVisibility(View.GONE);
+                filtersPanel.setVisibility(View.GONE);
+                asanaStatusIcon.setVisibility(View.GONE);
+                togglStatusIcon.setVisibility(View.GONE);
+                connectionApprovePanel.setVisibility(View.GONE);
+                startTypewriterAnimation(typewriterStatusText, "Połącz z Asana, aby wyświetlić zadania. Kliknij zębatkę w prawym górnym rogu.");
+            } else {
+                connectionStatusPanel.setVisibility(View.GONE);
+                recyclerView.setVisibility(View.VISIBLE);
+                asanaStatusIcon.setVisibility(View.VISIBLE);
+                asanaStatusIcon.setImageResource(R.drawable.ic_check_circle);
+                togglStatusIcon.setVisibility(View.VISIBLE);
+                togglStatusIcon.setImageResource(R.drawable.ic_check_circle);
+                connectionApprovePanel.setVisibility(View.GONE);
+                // Dalej normalne ładowanie zadań
+                swipeRefreshLayout.setRefreshing(true);
+                allTasks.clear();
+                allTasks.addAll(Task.loadTasks(getContext()));
+                filterOutPaidCompletedTasks();
+                if (getActivity() instanceof com.example.freelancera.MainActivity) {
+                    ((com.example.freelancera.MainActivity) getActivity()).syncTogglData();
+                }
+            }
+        });
     }
 
     private void loadTasks() {
@@ -906,5 +978,23 @@ public class TaskListFragment extends Fragment {
         });
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
         recyclerView.setAdapter(adapter);
+    }
+
+    // Animacja typewriter (jak w LoginActivity)
+    private void startTypewriterAnimation(TextView textView, String text) {
+        final Handler handler = new Handler();
+        final int[] currentIndex = {0};
+        final long TYPING_DELAY = 55;
+        textView.setText("");
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                if (currentIndex[0] <= text.length()) {
+                    textView.setText(text.substring(0, currentIndex[0]));
+                    currentIndex[0]++;
+                    handler.postDelayed(this, TYPING_DELAY);
+                }
+            }
+        });
     }
 }

@@ -8,7 +8,7 @@
     <View
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@drawable/top_gradient" />
+        />
 
     <!-- Główna zawartość -->
     <LinearLayout
@@ -39,14 +39,15 @@
             android:layout_marginTop="20dp" />
 
         <TextView
-            android:id="@+id/appSubtitle"
+
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:id="@+id/typewriterText"
             android:text="Wspomaganie pracy freelancera"
             android:textSize="16sp"
             android:textColor="#666666"
             android:layout_marginTop="8dp"
-            android:fontFamily="sans-serif" />
+            />
     </LinearLayout>
 
 </FrameLayout>
