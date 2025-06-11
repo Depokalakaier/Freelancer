@@ -31,13 +31,11 @@ public class Task implements Parcelable {
     private Date completedDate;
     private String asanaId;
     private boolean hasInvoice;
-    private boolean hasClockifyTime;
     private String source; // "asana" lub "local"
     private boolean needsSync; // true jeśli zadanie wymaga synchronizacji z Asana
     private Date lastSyncDate; // data ostatniej synchronizacji
     private Date createdAt;
     // Nowe pola dla Clockify
-    private String clockifyTimeEntryId;
     private long totalTimeInSeconds;
     private Date startTime;
     private Date endTime;
@@ -55,9 +53,6 @@ public class Task implements Parcelable {
     private Date completedAt;
     // Dodaję pole context (jeśli nie ma)
     private transient android.content.Context context;
-    private String formattedTotalTime;
-    private String formattedAmount;
-    private String completedStatus;
 
     public Task() {
         // Required empty constructor for Firestore
@@ -76,7 +71,6 @@ public class Task implements Parcelable {
         this.status = status;
         this.ratePerHour = 0.0;
         this.hasInvoice = false;
-        this.hasClockifyTime = false;
         this.source = "asana";
         this.needsSync = false;
         this.lastSyncDate = new Date();
@@ -95,7 +89,6 @@ public class Task implements Parcelable {
         completedDate = completedDateLong != -1 ? new Date(completedDateLong) : null;
         asanaId = in.readString();
         hasInvoice = in.readByte() != 0;
-        hasClockifyTime = in.readByte() != 0;
         source = in.readString();
         needsSync = in.readByte() != 0;
         long lastSyncDateLong = in.readLong();
@@ -114,7 +107,6 @@ public class Task implements Parcelable {
         dest.writeLong(completedDate != null ? completedDate.getTime() : -1);
         dest.writeString(asanaId);
         dest.writeByte((byte) (hasInvoice ? 1 : 0));
-        dest.writeByte((byte) (hasClockifyTime ? 1 : 0));
         dest.writeString(source);
         dest.writeByte((byte) (needsSync ? 1 : 0));
         dest.writeLong(lastSyncDate != null ? lastSyncDate.getTime() : -1);
@@ -297,9 +289,6 @@ public class Task implements Parcelable {
     public boolean isHasInvoice() { return hasInvoice; }
     public void setHasInvoice(boolean hasInvoice) { this.hasInvoice = hasInvoice; }
 
-    public boolean isHasClockifyTime() { return hasClockifyTime; }
-    public void setHasClockifyTime(boolean hasClockifyTime) { this.hasClockifyTime = hasClockifyTime; }
-
     public String getSource() { return source; }
     public void setSource(String source) { this.source = source; }
 
@@ -311,9 +300,6 @@ public class Task implements Parcelable {
 
     public Date getCreatedAt() { return createdAt; }
     public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
-
-    public String getClockifyTimeEntryId() { return clockifyTimeEntryId; }
-    public void setClockifyTimeEntryId(String clockifyTimeEntryId) { this.clockifyTimeEntryId = clockifyTimeEntryId; }
 
     public long getTotalTimeInSeconds() { return totalTimeInSeconds; }
     public void setTotalTimeInSeconds(long totalTimeInSeconds) { 
@@ -385,14 +371,15 @@ public class Task implements Parcelable {
         }
     }
 
-    public String getFormattedTotalTime() { return formattedTotalTime; }
-    public void setFormattedTotalTime(String formattedTotalTime) { this.formattedTotalTime = formattedTotalTime; }
+    public String getFormattedTotalTime() {
+        long hours = totalTimeInSeconds / 3600;
+        long minutes = (totalTimeInSeconds % 3600) / 60;
+        return String.format(Locale.getDefault(), "%02d:%02d", hours, minutes);
+    }
 
-    public String getFormattedAmount() { return formattedAmount; }
-    public void setFormattedAmount(String formattedAmount) { this.formattedAmount = formattedAmount; }
-
-    public String getCompletedStatus() { return completedStatus; }
-    public void setCompletedStatus(String completedStatus) { this.completedStatus = completedStatus; }
+    public String getFormattedAmount() {
+        return String.format(Locale.getDefault(), "%.2f %s", totalAmount, currency);
+    }
 
     public void updateTogglData(Context context, long trackedSeconds, String projectName, String clientName) {
         this.togglTrackedSeconds = trackedSeconds;

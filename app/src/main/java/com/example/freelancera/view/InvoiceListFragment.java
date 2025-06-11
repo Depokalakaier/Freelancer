@@ -28,6 +28,9 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import androidx.core.content.ContextCompat;
 import androidx.core.app.ActivityCompat;
+import com.example.freelancera.util.NotificationHelper;
+import java.util.function.Consumer;
+import com.example.freelancera.util.InvoiceSyncHelper;
 
 public class InvoiceListFragment extends Fragment {
     private RecyclerView recyclerView;
@@ -78,111 +81,23 @@ public class InvoiceListFragment extends Fragment {
         }
         Toast.makeText(getContext(), "Synchronizuję faktury z zadaniami...", Toast.LENGTH_SHORT).show();
         Log.i("InvoiceSync", "Rozpoczynam synchronizację faktur z zadaniami...");
-        firestore.collection("users").document(user.getUid())
-            .collection("invoices")
-            .get()
-            .addOnSuccessListener(invoiceSnapshots -> {
-                List<String> paidTaskIds = new ArrayList<>();
-                for (QueryDocumentSnapshot invDoc : invoiceSnapshots) {
-                    Invoice inv = invDoc.toObject(Invoice.class);
-                    if ("PAID".equals(inv.getStatus()) || Boolean.TRUE.equals(invDoc.getBoolean("isArchived"))) {
-                        paidTaskIds.add(inv.getTaskId());
-                        Log.d("InvoiceSync", "Faktura opłacona/zarchiwizowana: " + inv.getId());
-                        continue;
-                    }
-                    invoices.add(inv);
-                }
-                // Teraz pobierz zadania i generuj faktury tylko dla tych, które nie są opłacone
-                firestore.collection("users").document(user.getUid())
-                    .collection("tasks")
-                    .get()
-                    .addOnSuccessListener(queryDocumentSnapshots -> {
-                        int count = 0;
-                        for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
-                            com.example.freelancera.models.Task task = doc.toObject(com.example.freelancera.models.Task.class);
-                            if (task.getStatus() != null && task.getStatus().startsWith("Ukończone") && !paidTaskIds.contains(task.getId())) {
-                                // Zawsze generuj/aktualizuj fakturę na podstawie zadania
-                                double hours;
-                                if (task.getTogglTrackedSeconds() > 0) {
-                                    hours = task.getTogglTrackedSeconds() / 3600.0;
-                                    Log.d("InvoiceSync", "Użyto czasu z Toggl: " + hours + "h dla zadania: " + task.getName());
-                                } else {
-                                    hours = task.getTotalTimeInSeconds() / 3600.0;
-                                    Log.d("InvoiceSync", "Użyto czasu lokalnego: " + hours + "h dla zadania: " + task.getName());
-                                }
-                                double rate = task.getRatePerHour();
-                                double amount = hours * rate;
-                                com.example.freelancera.models.Invoice invoice = null;
-                                // Szukaj istniejącej faktury po taskId
-                                for (Invoice inv : invoices) {
-                                    if (inv.getTaskId() != null && inv.getTaskId().equals(task.getId())) {
-                                        invoice = inv;
-                                        break;
-                                    }
-                                }
-                                boolean isNewInvoice = (invoice == null);
-                                if (isNewInvoice) {
-                                    invoice = new com.example.freelancera.models.Invoice(task.getId(), task.getClient(), task.getName(), rate);
-                                    invoice.setHours(hours);
-                                    invoice.setTotalAmount(amount);
-                                    invoice.setId("FV-" + new java.text.SimpleDateFormat("yyyyMMdd-HHmmssSSS").format(new java.util.Date()));
-                                    invoice.setLocalOnly(false);
-                                }
-                                invoice.setTaskName(task.getName());
-                                invoice.setClientName(task.getClient());
-                                // Zaokrąglanie godzin jak w zadaniach
-                                int intHours = (int) hours;
-                                int minutes = (int) ((hours - intHours) * 60);
-                                double rounded = intHours;
-                                if (minutes >= 16 && minutes <= 44) rounded += 0.5;
-                                else if (minutes >= 45) rounded += 1.0;
-                                else if (minutes > 0) rounded += 1.0;
-                                invoice.setHours(rounded);
-                                invoice.setRatePerHour(rate);
-                                invoice.setTotalAmount(rounded * rate);
-                                java.util.Date issue = task.getCompletedAt() != null ? task.getCompletedAt() : new java.util.Date();
-                                invoice.setIssueDate(issue);
-                                // Termin płatności = 7 dni po dacie zakończenia
-                                java.util.Date due = new java.util.Date(issue.getTime() + 7 * 24 * 60 * 60 * 1000);
-                                invoice.setDueDate(due);
-                                if (!invoices.contains(invoice)) {
-                                    invoices.add(invoice);
-                                }
-                                LocalInvoiceStorage.saveInvoice(getContext(), invoice);
-                                if (isNewInvoice) {
-                                    // Dodaj tylko nowe faktury do Firestore
-                                    final Invoice invoiceToSave = invoice;
-                                    firestore.collection("users").document(user.getUid())
-                                        .collection("invoices").document(invoiceToSave.getId())
-                                        .set(invoiceToSave)
-                                        .addOnSuccessListener(unused -> Log.d("InvoiceSync", "Faktura zapisana w Firestore: " + invoiceToSave.getId()))
-                                        .addOnFailureListener(e -> Log.e("InvoiceSync", "Błąd zapisu faktury w Firestore: " + e.getMessage()));
-                                    Log.d("InvoiceSync", "Dodano nową fakturę: " + invoiceToSave.getId() + ", klient: " + invoiceToSave.getClientName() + ", kwota: " + invoiceToSave.getTotalAmount());
-                                } else {
-                                    Log.d("InvoiceSync", "Pominięto nadpisanie istniejącej faktury: " + invoice.getId());
-                                }
-                                count++;
-                            }
-                        }
-                        adapter.notifyDataSetChanged();
-                        Toast.makeText(getContext(), "Zsynchronizowano faktury: " + count, Toast.LENGTH_SHORT).show();
-                        Log.i("InvoiceSync", "Zakończono synchronizację. Liczba faktur: " + count);
-                    })
-                    .addOnFailureListener(e -> {
-                        Toast.makeText(getContext(), "Błąd synchronizacji faktur: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                        Log.e("InvoiceSync", "Błąd synchronizacji faktur: " + e.getMessage());
-                    });
-            })
-            .addOnFailureListener(e -> {
-                Toast.makeText(getContext(), "Błąd synchronizacji faktur: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                Log.e("InvoiceSync", "Błąd synchronizacji faktur: " + e.getMessage());
-            });
+        InvoiceSyncHelper.syncInvoicesWithTasks(getContext(), firestore, user, () -> {
+            adapter.notifyDataSetChanged();
+            Toast.makeText(getContext(), "Zsynchronizowano faktury: " + invoices.size(), Toast.LENGTH_SHORT).show();
+            Log.i("InvoiceSync", "Zakończono synchronizację. Liczba faktur: " + invoices.size());
+        }, invoices -> {
+            this.invoices.clear();
+            this.invoices.addAll(invoices);
+            for (Invoice invoice : invoices) {
+                LocalInvoiceStorage.saveInvoice(getContext(), invoice);
+                addCalendarReminder(getContext(), invoice);
+            }
+        });
     }
 
-    private void addCalendarReminder(Context context, Invoice invoice) {
+    public void addCalendarReminder(Context context, Invoice invoice) {
         if (context == null || invoice == null) return;
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CALENDAR) != PackageManager.PERMISSION_GRANTED) {
-            // Poproś o uprawnienia
             if (getActivity() != null) {
                 pendingCalendarInvoice = invoice;
                 ActivityCompat.requestPermissions(getActivity(),
@@ -192,16 +107,21 @@ public class InvoiceListFragment extends Fragment {
             }
             return;
         }
-        // Pobierz domyślny kalendarz
         long calendarId = getPrimaryCalendarId(context);
         if (calendarId == -1) {
             Toast.makeText(context, "Nie znaleziono domyślnego kalendarza", Toast.LENGTH_SHORT).show();
             Log.w("InvoiceSync", "Brak domyślnego kalendarza, nie dodano przypomnienia");
+            addSyncHistory(invoice, "REMINDER_FAILED", "Brak domyślnego kalendarza", false, "Brak domyślnego kalendarza");
             return;
         }
-        long startMillis = System.currentTimeMillis() + 24 * 60 * 60 * 1000; // następny dzień
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.add(java.util.Calendar.DAY_OF_YEAR, 1);
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 15);
+        cal.set(java.util.Calendar.MINUTE, 0);
+        cal.set(java.util.Calendar.SECOND, 0);
+        cal.set(java.util.Calendar.MILLISECOND, 0);
+        long startMillis = cal.getTimeInMillis();
         String eventTitle = "Faktura: " + invoice.getId();
-        // Sprawdź, czy już istnieje przypomnienie z tym tytułem i datą
         String selection = CalendarContract.Events.TITLE + "=? AND " + CalendarContract.Events.DTSTART + "=? AND " + CalendarContract.Events.CALENDAR_ID + "=?";
         String[] selectionArgs = new String[]{eventTitle, String.valueOf(startMillis), String.valueOf(calendarId)};
         boolean exists = false;
@@ -216,21 +136,28 @@ public class InvoiceListFragment extends Fragment {
             }
         } catch (Exception e) {
             Log.e("InvoiceSync", "Błąd sprawdzania duplikatu przypomnienia", e);
+            addSyncHistory(invoice, "REMINDER_FAILED", "Błąd sprawdzania duplikatu przypomnienia", false, e.getMessage());
         }
         if (exists) {
             Log.i("InvoiceSync", "Przypomnienie dla tej faktury już istnieje, nie dodaję duplikatu: " + invoice.getId());
             return;
         }
-        ContentValues values = new ContentValues();
-        values.put(CalendarContract.Events.DTSTART, startMillis);
-        values.put(CalendarContract.Events.DTEND, startMillis + 60 * 60 * 1000);
-        values.put(CalendarContract.Events.TITLE, eventTitle);
-        values.put(CalendarContract.Events.DESCRIPTION, "Faktura dla: " + invoice.getClientName() + ", zadanie: " + invoice.getTaskName());
-        values.put(CalendarContract.Events.CALENDAR_ID, calendarId);
-        values.put(CalendarContract.Events.EVENT_TIMEZONE, java.util.TimeZone.getDefault().getID());
-        context.getContentResolver().insert(CalendarContract.Events.CONTENT_URI, values);
-        Toast.makeText(context, "Dodano przypomnienie do kalendarza", Toast.LENGTH_SHORT).show();
-        Log.i("InvoiceSync", "Dodano przypomnienie do kalendarza dla faktury: " + invoice.getId());
+        try {
+            ContentValues values = new ContentValues();
+            values.put(CalendarContract.Events.DTSTART, startMillis);
+            values.put(CalendarContract.Events.DTEND, startMillis + 60 * 60 * 1000);
+            values.put(CalendarContract.Events.TITLE, eventTitle);
+            values.put(CalendarContract.Events.DESCRIPTION, "Faktura dla: " + invoice.getClientName() + ", zadanie: " + invoice.getTaskName());
+            values.put(CalendarContract.Events.CALENDAR_ID, calendarId);
+            values.put(CalendarContract.Events.EVENT_TIMEZONE, java.util.TimeZone.getDefault().getID());
+            context.getContentResolver().insert(CalendarContract.Events.CONTENT_URI, values);
+            Toast.makeText(context, "Dodano przypomnienie do kalendarza", Toast.LENGTH_SHORT).show();
+            Log.i("InvoiceSync", "Dodano przypomnienie do kalendarza dla faktury: " + invoice.getId());
+            NotificationHelper.showNotification(context, "Przypomnienie o fakturze", "Dodano przypomnienie o zapłaceniu faktury: " + invoice.getId(), (int) (System.currentTimeMillis() % Integer.MAX_VALUE));
+        } catch (Exception e) {
+            Log.e("InvoiceSync", "Błąd dodawania przypomnienia do kalendarza", e);
+            addSyncHistory(invoice, "REMINDER_FAILED", "Błąd dodawania przypomnienia do kalendarza", false, e.getMessage());
+        }
     }
 
     private long getPrimaryCalendarId(Context context) {
@@ -258,6 +185,22 @@ public class InvoiceListFragment extends Fragment {
             Log.e("InvoiceSync", "Błąd pobierania kalendarza", e);
         }
         return -1;
+    }
+
+    private void addSyncHistory(Invoice invoice, String action, String details, boolean success, String errorMessage) {
+        if (user == null || firestore == null) return;
+        com.example.freelancera.models.SyncHistory history = new com.example.freelancera.models.SyncHistory(
+            invoice.getTaskId(),
+            invoice.getTaskName(),
+            action,
+            details,
+            success,
+            errorMessage
+        );
+        firestore.collection("users")
+                .document(user.getUid())
+                .collection("sync_history")
+                .add(history);
     }
 
     @Override

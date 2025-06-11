@@ -37,7 +37,7 @@
                 android:background="@android:color/transparent"
                 android:contentDescription="Ustawienia"
                 android:src="@drawable/ic_settings_24"
-                android:tint="#dfd4be" />
+                app:tint="#dfd4be" />
         </androidx.appcompat.widget.Toolbar>
 
     </com.google.android.material.appbar.AppBarLayout>

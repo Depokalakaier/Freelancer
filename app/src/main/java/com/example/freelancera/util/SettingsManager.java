@@ -41,7 +41,7 @@ public class SettingsManager {
         settings.setPhone(prefs.getString("phone", ""));
         settings.setPreferredLanguage(prefs.getString("preferredLanguage", "PL"));
         settings.setProjectTool(prefs.getString("projectTool", "Asana"));
-        settings.setTimeTrackingTool(prefs.getString("timeTrackingTool", "Clockify"));
+        // settings.setTimeTrackingTool(prefs.getString("timeTrackingTool", "Clockify"));
         settings.setInvoiceTool(prefs.getString("invoiceTool", "InvoiceNinja"));
         return settings;
     }

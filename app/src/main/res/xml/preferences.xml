@@ -2,22 +2,4 @@
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <PreferenceCategory
-        android:title="Clockify"
-        app:iconSpaceReserved="false">
-
-        <EditTextPreference
-            android:key="clockify_api_key"
-            android:title="Klucz API Clockify"
-            android:summary="Wprowadź klucz API z Clockify"
-            app:iconSpaceReserved="false"/>
-
-        <EditTextPreference
-            android:key="clockify_workspace_id"
-            android:title="ID Workspace Clockify"
-            android:summary="Wprowadź ID przestrzeni roboczej Clockify"
-            app:iconSpaceReserved="false"/>
-
-    </PreferenceCategory>
-
 </PreferenceScreen> 

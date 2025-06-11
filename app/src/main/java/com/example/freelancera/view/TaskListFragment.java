@@ -62,6 +62,8 @@ import androidx.core.content.ContextCompat;
 import com.example.freelancera.util.CalendarUtils;
 import android.widget.Button;
 import com.example.freelancera.util.SyncWorker;
+import com.example.freelancera.util.InvoiceSyncHelper;
+import java.util.function.Consumer;
 
 /**
  * TaskListFragment - fragment wyświetlający listę zadań użytkownika.
@@ -208,7 +210,7 @@ public class TaskListFragment extends Fragment {
                     allTasks.add(task);
                     taskStorage.saveTask(task);
                     if (task.isCompletedStatus() && !task.isHasInvoice()) {
-                        handleCompletedTask(task);
+                        // handleCompletedTask(task);
                     }
                 }
                 adapter.updateTasks(allTasks);
@@ -297,6 +299,13 @@ public class TaskListFragment extends Fragment {
         for (Task task : allTasks) {
             taskStorage.saveTask(task);
         }
+
+        // Po zakończeniu odświeżania zadań:
+        InvoiceSyncHelper.syncInvoicesWithTasks(getContext(), firestore, user, () -> {
+            // Możesz dodać tu np. Toast lub log
+        }, invoices -> {
+            // Możesz dodać tu logikę odświeżenia UI faktur, jeśli chcesz
+        });
     }
 
     private void fetchTasksFromAsanaAndSave(String token, String uid) {
@@ -602,7 +611,7 @@ public class TaskListFragment extends Fragment {
                         allTasks.add(task);
                         taskStorage.saveTask(task);
                         if (task.isCompletedStatus() && !task.isHasInvoice()) {
-                            handleCompletedTask(task);
+                            // handleCompletedTask(task);
                         }
                     }
                     firestore.collection("users").document(uid).get().addOnSuccessListener(userDoc -> {
@@ -748,94 +757,6 @@ public class TaskListFragment extends Fragment {
 
         // Sort tasks based on current sort settings
         filterOutPaidCompletedTasks();
-    }
-
-    private void handleCompletedTask(Task task) {
-        // Ustaw context, by stawka była zawsze pobierana lokalnie
-        task.setContext(getContext());
-        // Sprawdź czy mamy dane z Clockify
-        if (!task.isHasClockifyTime()) {
-            addSyncHistory(task, "CLOCKIFY_CHECK", "Nie masz autoryzacji z Clockify", false, 
-                "Połącz konto Clockify aby automatycznie pobierać czas pracy");
-        }
-        // Generuj fakturę tylko jeśli nie istnieje
-        FirebaseFirestore.getInstance().collection("users").document(user.getUid())
-            .collection("invoices")
-            .whereEqualTo("taskId", task.getId())
-            .get()
-            .addOnSuccessListener(query -> {
-                if (query.isEmpty()) {
-                    createInvoiceForCompletedTask(task);
-                }
-            });
-    }
-
-    private void createInvoiceForCompletedTask(Task task) {
-        Invoice invoice = new Invoice(task.getId(), task.getClient(), task.getName(), task.getRatePerHour());
-        invoice.setHours(task.getTogglTrackedSeconds() / 3600.0); // Konwersja sekund na godziny
-        invoice.recalculateTotal();
-        String uid = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        firestore.collection("users").document(uid)
-                .collection("invoices").add(invoice)
-                    .addOnSuccessListener(documentReference -> {
-                    invoice.setId(documentReference.getId());
-                    task.setHasInvoice(true);
-                    task.setInvoiceNumber(documentReference.getId());
-                    // NIE zmieniaj statusu na 'Ukończone (faktura utworzona)'
-                    // Aktualizuj zadanie w Firestore i lokalnie
-                    firestore.collection("users").document(uid)
-                            .collection("tasks").document(task.getId())
-                            .set(task)
-                            .addOnSuccessListener(aVoid -> {
-                                taskStorage.saveTask(task);
-                                Toast.makeText(getContext(), "Utworzono fakturę roboczą", Toast.LENGTH_SHORT).show();
-                            });
-                    // Dodaj przypomnienie do kalendarza
-                    addCalendarReminder(task);
-                    })
-                    .addOnFailureListener(e -> {
-                    Toast.makeText(getContext(), "Błąd tworzenia faktury: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                    });
-    }
-
-    private void addCalendarReminder(Task task) {
-        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.WRITE_CALENDAR) != PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.READ_CALENDAR) != PackageManager.PERMISSION_GRANTED) {
-            // Poproś o uprawnienia
-            pendingCalendarTask = task;
-            ActivityCompat.requestPermissions(requireActivity(),
-                new String[]{Manifest.permission.WRITE_CALENDAR, Manifest.permission.READ_CALENDAR},
-                CALENDAR_PERMISSION_REQUEST_CODE);
-            return;
-        }
-        if (task.isHasInvoice()) return; // nie dodawaj przypomnienia jeśli faktura opłacona lub już istnieje
-        Calendar calendar = Calendar.getInstance();
-        calendar.add(Calendar.DAY_OF_MONTH, 1); // Przypomnienie na następny dzień
-        com.example.freelancera.util.CalendarUtils.addEventDirectly(
-            requireContext(),
-            task.getClient(),
-            "Wyślij fakturę do klienta: " + task.getClient() + ", zadanie: " + task.getName(),
-            calendar.getTimeInMillis()
-        );
-        addSyncHistory(task, "REMINDER_ADDED", 
-            "Dodano przypomnienie do kalendarza", true, null);
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == CALENDAR_PERMISSION_REQUEST_CODE) {
-            boolean granted = true;
-            for (int res : grantResults) {
-                if (res != PackageManager.PERMISSION_GRANTED) granted = false;
-            }
-            if (granted && pendingCalendarTask != null) {
-                addCalendarReminder(pendingCalendarTask);
-                pendingCalendarTask = null;
-            } else {
-                Toast.makeText(getContext(), "Brak zgody na dostęp do kalendarza!", Toast.LENGTH_SHORT).show();
-            }
-        }
     }
 
     private void addSyncHistory(Task task, String action, String details, 

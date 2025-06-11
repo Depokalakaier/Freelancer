@@ -60,11 +60,17 @@ public class SyncWorker extends Worker {
                 for (QueryDocumentSnapshot invDoc : invoiceSnapshots) {
                     Invoice invoice = invDoc.toObject(Invoice.class);
                     if (invoice == null) continue;
-                    if ("PAID".equals(invoice.getStatus()) || invoice.isPaid()) continue;
-                    // Sprawdź, czy istnieje przypomnienie na następny dzień o 15:00
+                    Log.i("SyncWorker", "[REMINDER] Sprawdzam fakturę: " + invoice.getId() + ", status: " + invoice.getStatus());
+                    if ("PAID".equals(invoice.getStatus()) || invoice.isPaid()) {
+                        Log.i("SyncWorker", "[REMINDER] Pomijam fakturę (PAID): " + invoice.getId());
+                        continue;
+                    }
                     Context context = getApplicationContext();
                     long calendarId = getPrimaryCalendarId(context);
-                    if (calendarId == -1) continue;
+                    if (calendarId == -1) {
+                        Log.w("SyncWorker", "[REMINDER] Brak domyślnego kalendarza, nie dodano przypomnienia dla: " + invoice.getId());
+                        continue;
+                    }
                     Calendar cal = Calendar.getInstance();
                     cal.add(Calendar.DAY_OF_YEAR, 1);
                     cal.set(Calendar.HOUR_OF_DAY, 15);
@@ -72,7 +78,8 @@ public class SyncWorker extends Worker {
                     cal.set(Calendar.SECOND, 0);
                     cal.set(Calendar.MILLISECOND, 0);
                     long startMillis = cal.getTimeInMillis();
-                    String eventTitle = "Faktura: " + invoice.getTaskName();
+                    String eventTitle = "Faktura: " + invoice.getId();
+                    Log.i("SyncWorker", "[REMINDER] eventTitle: " + eventTitle + ", startMillis: " + startMillis);
                     String selection = CalendarContract.Events.TITLE + "=? AND " + CalendarContract.Events.DTSTART + "=? AND " + CalendarContract.Events.CALENDAR_ID + "=?";
                     String[] selectionArgs = new String[]{eventTitle, String.valueOf(startMillis), String.valueOf(calendarId)};
                     boolean exists = false;
@@ -86,21 +93,28 @@ public class SyncWorker extends Worker {
                             exists = true;
                         }
                     } catch (Exception e) {
-                        Log.e("SyncWorker", "Błąd sprawdzania duplikatu przypomnienia", e);
+                        Log.e("SyncWorker", "[REMINDER] Błąd sprawdzania duplikatu przypomnienia dla: " + invoice.getId(), e);
                     }
+                    Log.i("SyncWorker", "[REMINDER] Czy istnieje już wydarzenie: " + exists);
                     if (!exists) {
-                        // Dodaj przypomnienie
-                        ContentValues values = new ContentValues();
-                        values.put(CalendarContract.Events.DTSTART, startMillis);
-                        values.put(CalendarContract.Events.DTEND, startMillis + 60 * 60 * 1000);
-                        values.put(CalendarContract.Events.TITLE, eventTitle);
-                        values.put(CalendarContract.Events.DESCRIPTION, "Faktura dla: " + invoice.getClientName() + ", zadanie: " + invoice.getTaskName());
-                        values.put(CalendarContract.Events.CALENDAR_ID, calendarId);
-                        values.put(CalendarContract.Events.EVENT_TIMEZONE, java.util.TimeZone.getDefault().getID());
-                        context.getContentResolver().insert(CalendarContract.Events.CONTENT_URI, values);
-                        Log.i("SyncWorker", "Dodano przypomnienie do kalendarza dla faktury: " + invoice.getTaskName());
-                        // Powiadomienie w aplikacji
-                        NotificationHelper.showNotification(context, "Przypomnienie o fakturze", "Dodano przypomnienie o zapłaceniu faktury: " + invoice.getTaskName(), (int) (System.currentTimeMillis() % Integer.MAX_VALUE));
+                        try {
+                            ContentValues values = new ContentValues();
+                            values.put(CalendarContract.Events.DTSTART, startMillis);
+                            values.put(CalendarContract.Events.DTEND, startMillis + 60 * 60 * 1000);
+                            values.put(CalendarContract.Events.TITLE, eventTitle);
+                            values.put(CalendarContract.Events.DESCRIPTION, "Faktura dla: " + invoice.getClientName() + ", zadanie: " + invoice.getTaskName());
+                            values.put(CalendarContract.Events.CALENDAR_ID, calendarId);
+                            values.put(CalendarContract.Events.EVENT_TIMEZONE, java.util.TimeZone.getDefault().getID());
+                            context.getContentResolver().insert(CalendarContract.Events.CONTENT_URI, values);
+                            Log.i("SyncWorker", "[REMINDER] Dodano przypomnienie do kalendarza dla faktury: " + invoice.getId());
+                            NotificationHelper.showNotification(context, "Przypomnienie o fakturze", "Dodano przypomnienie o zapłaceniu faktury: " + invoice.getId(), (int) (System.currentTimeMillis() % Integer.MAX_VALUE));
+                            Log.i("SyncWorker", "[REMINDER] Wywołano powiadomienie dla faktury: " + invoice.getId());
+                        } catch (Exception e) {
+                            Log.e("SyncWorker", "[REMINDER] Błąd dodawania przypomnienia do kalendarza dla: " + invoice.getId(), e);
+                            addSyncHistory(invoice, "REMINDER_FAILED", "Błąd dodawania przypomnienia do kalendarza", false, e.getMessage());
+                        }
+                    } else {
+                        Log.i("SyncWorker", "[REMINDER] Przypomnienie już istnieje w kalendarzu dla: " + invoice.getId());
                     }
                 }
                 latch.countDown();
@@ -149,14 +163,15 @@ public class SyncWorker extends Worker {
             long calendarId = getPrimaryCalendarId(context);
             if (calendarId == -1) {
                 Log.w("SyncWorker", "Brak domyślnego kalendarza, nie dodano przypomnienia");
+                // Dodaj wpis do historii synchronizacji
+                addSyncHistory(invoice, "REMINDER_FAILED", "Brak domyślnego kalendarza", false, "Brak domyślnego kalendarza");
                 return;
             }
             String eventTitle = "Faktura: " + invoice.getId() + " - Wyślij fakturę";
-            // Sprawdź, czy już istnieje wydarzenie z tym tytułem
             String selection = CalendarContract.Events.TITLE + "=? AND " + CalendarContract.Events.DTSTART + ">=?";
             String[] selectionArgs = new String[]{
                 eventTitle,
-                String.valueOf(System.currentTimeMillis() - 7 * 24 * 60 * 60 * 1000) // ostatni tydzień
+                String.valueOf(System.currentTimeMillis() - 7 * 24 * 60 * 60 * 1000)
             };
             try (android.database.Cursor cursor = context.getContentResolver().query(
                     CalendarContract.Events.CONTENT_URI,
@@ -169,7 +184,7 @@ public class SyncWorker extends Worker {
                     return;
                 }
             }
-            long startMillis = System.currentTimeMillis() + 24 * 60 * 60 * 1000; // następny dzień
+            long startMillis = System.currentTimeMillis() + 24 * 60 * 60 * 1000;
             ContentValues values = new ContentValues();
             values.put(CalendarContract.Events.DTSTART, startMillis);
             values.put(CalendarContract.Events.DTEND, startMillis + 60 * 60 * 1000);
@@ -181,7 +196,27 @@ public class SyncWorker extends Worker {
             Log.i("SyncWorker", "Dodano przypomnienie do kalendarza dla: " + eventTitle);
         } catch (Exception e) {
             Log.e("SyncWorker", "Błąd dodawania przypomnienia do kalendarza", e);
+            // Dodaj wpis do historii synchronizacji
+            addSyncHistory(invoice, "REMINDER_FAILED", "Błąd dodawania przypomnienia do kalendarza", false, e.getMessage());
         }
+    }
+
+    private void addSyncHistory(Invoice invoice, String action, String details, boolean success, String errorMessage) {
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user == null) return;
+        FirebaseFirestore firestore = FirebaseFirestore.getInstance();
+        com.example.freelancera.models.SyncHistory history = new com.example.freelancera.models.SyncHistory(
+            invoice.getTaskId(),
+            invoice.getTaskName(),
+            action,
+            details,
+            success,
+            errorMessage
+        );
+        firestore.collection("users")
+                .document(user.getUid())
+                .collection("sync_history")
+                .add(history);
     }
 
     private long getPrimaryCalendarId(Context context) {
@@ -233,7 +268,7 @@ public class SyncWorker extends Worker {
                     cal.set(Calendar.SECOND, 0);
                     cal.set(Calendar.MILLISECOND, 0);
                     long startMillis = cal.getTimeInMillis();
-                    String eventTitle = "Faktura: " + invoice.getTaskName();
+                    String eventTitle = "Faktura: " + invoice.getId();
                     String selection = CalendarContract.Events.TITLE + "=? AND " + CalendarContract.Events.DTSTART + "=? AND " + CalendarContract.Events.CALENDAR_ID + "=?";
                     String[] selectionArgs = new String[]{eventTitle, String.valueOf(startMillis), String.valueOf(calendarId)};
                     boolean exists = false;
